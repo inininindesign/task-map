@@ -41,13 +41,12 @@
       z-index: 150; overflow: hidden; pointer-events: none;
     }
     .role-pill {
-      position: absolute; top: 10px; height: 36px;
+      position: absolute; top: 10px; height: 36px; width: 140px;
       border-radius: 18px; border: 2px solid #4a9d96;
       background: white; color: #2e7a74;
       display: flex; align-items: center; justify-content: center;
       font-size: 12px; font-weight: 700;
       text-align: center; line-height: 1.3; white-space: pre;
-      transform-origin: left center;
     }
 
     /* ボード */
@@ -113,7 +112,7 @@
     .err-box strong { display: block; margin-bottom: 8px; font-size: 1rem; }
     .err-box code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 0.82rem; word-break: break-all; }
   </style>
-<!-- deploy:1775134812 --></head>
+<!-- deploy:1775135134 --></head>
 <body>
 
 <div id="toolbar">
@@ -199,10 +198,8 @@ async function loadData(force=false){
 // ── ヘッダーピルのX位置更新 ──
 function updateHeaders(){
   document.querySelectorAll('.role-pill').forEach((pill,ri)=>{
-    const boardX=PAD_L+ri*(COL_W+COL_GAP);
-    pill.style.left=(tx+boardX*sc)+'px';
-    pill.style.width=(COL_W*sc)+'px';
-    pill.style.transform=`scale(${1/sc})`;
+    const colCenterX=tx+(PAD_L+ri*(COL_W+COL_GAP)+COL_W/2)*sc;
+    pill.style.left=(colCenterX-70)+'px'; // 70 = pill width(140) / 2
   });
 }
 
