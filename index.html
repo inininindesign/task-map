@@ -33,64 +33,87 @@
     .dot.spin { background: none; border: 2px solid currentColor; border-top-color: transparent; animation: spin 0.8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ヘッダー行（ロール名・固定） */
+    #header-row {
+      position: fixed; top: 50px; left: 0; right: 0; height: 56px;
+      background: rgba(240,240,237,0.96); backdrop-filter: blur(6px);
+      border-bottom: 1px solid #d8d8d4;
+      z-index: 150; overflow: hidden; pointer-events: none;
+    }
+    .role-pill {
+      position: absolute; top: 10px; height: 36px;
+      border-radius: 18px; border: 2px solid #4a9d96;
+      background: white; color: #2e7a74;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700;
+      text-align: center; line-height: 1.3; white-space: pre;
+      transform-origin: left center;
+    }
+
+    /* ボード */
     #board-wrap {
-      position: fixed; top: 50px; left: 0; right: 0; bottom: 0;
-      overflow: hidden; background: #f5f5f3; cursor: grab; user-select: none;
+      position: fixed; top: 106px; left: 0; right: 0; bottom: 0;
+      overflow: hidden; cursor: grab; user-select: none;
+      background-color: #efefec;
+      background-image: radial-gradient(circle, #c4c4c0 1px, transparent 1px);
+      background-size: 20px 20px;
     }
     #board-wrap.grabbing { cursor: grabbing; }
     #board { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
 
-    .sec-label {
-      position: absolute; font-size: 11px; font-weight: 700; color: white;
-      padding: 5px 8px; border-radius: 5px;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-
-    .role-label {
-      position: absolute; font-size: 10px; font-weight: 700; color: #777;
-      display: flex; align-items: center; padding: 0 8px;
-      border-right: 1px solid #e0e0dc;
-      word-break: break-all; line-height: 1.35;
-    }
-
+    /* タスクカード */
     .tcard {
-      position: absolute; background: white; border-radius: 4px;
-      padding: 5px 7px; width: 148px; height: 40px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.10);
-      cursor: pointer; border-left: 3px solid #ddd;
-      transition: box-shadow 0.15s; overflow: hidden;
+      position: absolute; background: white;
+      border-radius: 8px; border: 2px solid #4a9d96;
+      padding: 7px 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      cursor: pointer; overflow: hidden;
+      transition: box-shadow 0.15s;
     }
-    .tcard:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.18); z-index: 50 !important; }
-    .tcard .ct { font-size: 10px; font-weight: 700; color: #1a1a2e; line-height: 1.3; max-height: 26px; overflow: hidden; }
-    .tcard .cp { font-size: 8px; line-height: 1.4; margin-top: 2px; }
-    .tcard .sup { color: #999; }
+    .tcard:hover { box-shadow: 0 4px 14px rgba(74,157,150,0.25); z-index: 50 !important; }
+    .tcard .ct { font-size: 11px; font-weight: 600; color: #1a3a38; line-height: 1.4; }
+    .tcard .cp { font-size: 9px; color: #999; margin-top: 3px; line-height: 1.4; }
 
+    /* セクション区切り */
+    .sec-divider {
+      position: absolute; display: flex; align-items: center; gap: 8px;
+      font-size: 10px; font-weight: 700; color: #aaa;
+      pointer-events: none; white-space: nowrap;
+    }
+    .sec-line {
+      position: absolute; background: #d8d8d4;
+      pointer-events: none;
+    }
+
+    /* 詳細パネル */
     #detail {
-      position: fixed; right: 16px; top: 66px; width: 260px;
+      position: fixed; right: 16px; top: 122px; width: 260px;
       background: white; border-radius: 12px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.16);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.14);
       padding: 18px; z-index: 300; display: none;
+      border-top: 3px solid #4a9d96;
     }
     #detail-close { position: absolute; top: 10px; right: 12px; background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #bbb; }
-    #detail h3 { font-size: 0.95rem; color: #1a1a2e; margin-bottom: 4px; line-height: 1.4; padding-right: 20px; }
+    #detail h3 { font-size: 0.95rem; color: #1a3a38; margin-bottom: 4px; line-height: 1.4; padding-right: 20px; }
     .d-section { font-size: 0.75rem; color: #aaa; margin-bottom: 12px; }
     .d-row { margin-bottom: 8px; }
     .d-label { font-size: 0.7rem; color: #bbb; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
     .d-val { font-size: 0.85rem; color: #333; }
     .d-note { font-size: 0.82rem; color: #666; line-height: 1.6; }
 
+    /* オーバーレイ */
     #overlay {
       position: fixed; inset: 50px 0 0 0;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      z-index: 400; background: #f5f5f3;
+      z-index: 400; background: #efefec;
     }
-    .spinner { width: 36px; height: 36px; border: 3px solid #ddd; border-top-color: #0f3460; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 14px; }
+    .spinner { width: 36px; height: 36px; border: 3px solid #ddd; border-top-color: #4a9d96; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 14px; }
     #overlay p { color: #888; font-size: 0.9rem; }
     .err-box { background: white; border-radius: 12px; padding: 24px; max-width: 440px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); line-height: 1.8; font-size: 0.88rem; color: #444; }
-    .err-box strong { display: block; margin-bottom: 8px; font-size: 1rem; color: #1a1a2e; }
+    .err-box strong { display: block; margin-bottom: 8px; font-size: 1rem; }
     .err-box code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 0.82rem; word-break: break-all; }
   </style>
-<!-- deploy:1775132865 --></head>
+<!-- deploy:1775134812 --></head>
 <body>
 
 <div id="toolbar">
@@ -104,6 +127,7 @@
   <div id="statusBadge"><span class="dot spin" id="sDot"></span><span id="sTxt">読み込み中...</span></div>
 </div>
 
+<div id="header-row"></div>
 <div id="board-wrap"><div id="board"></div></div>
 
 <div id="overlay">
@@ -121,24 +145,21 @@
 </div>
 
 <script>
-const GAS_URL   = 'https://script.google.com/macros/s/AKfycbwhOvw4xINmgtzSKBJBI1FkfdGmhlnRGU9djtF1pl-iiGBbk9E5KaC59RIe4avVFtiH/exec'; // ← GASデプロイ後にここを更新
-const CACHE_KEY = 'taskmap_v2';
+const GAS_URL   = 'https://script.google.com/macros/s/AKfycbwhOvw4xINmgtzSKBJBI1FkfdGmhlnRGU9djtF1pl-iiGBbk9E5KaC59RIe4avVFtiH/exec';
+const CACHE_KEY = 'taskmap_v3';
 const TTL_MS    = 30 * 60 * 1000;
 
-const CARD_W        = 148;
-const CARD_H        = 40;
-const CARD_GAP      = 6;
-const SECTION_W     = 164;
-const SECTION_GAP   = 12;
-const SECTION_HDR_H = 34;
-const LANE_LABEL_W  = 88;
-const LANE_H        = 120;
-const PAD_T         = 16;
-const PAD_L         = 16;
-const PAD_B         = 40;
-const PAD_R         = 40;
-
-const COLORS = ['#4e9af1','#f59e0b','#10b981','#e94560','#8b5cf6','#06b6d4','#f97316','#ec4899','#64748b','#84cc16'];
+const COL_W      = 160;
+const COL_GAP    = 24;
+const CARD_W     = 148;
+const CARD_H     = 48;
+const ROW_H      = 68;
+const SEC_HDR_H  = 28;
+const SEC_HDR_MB = 10;
+const PAD_T      = 12;
+const PAD_L      = 16;
+const PAD_B      = 60;
+const PAD_R      = 40;
 
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function setStatus(color,text,spin=false){
@@ -153,12 +174,6 @@ let DATA=null, fetching=false;
 
 async function loadData(force=false){
   if(fetching) return;
-  if(GAS_URL==='YOUR_GAS_URL_HERE'){
-    document.getElementById('overlay').style.display='flex';
-    document.getElementById('overlay').innerHTML='<div class="err-box"><strong>⚙️ セットアップ未完了</strong>gas_script.js をGASにデプロイし、index.html の <code>GAS_URL</code> を更新してください。</div>';
-    setStatus('#fca5a5','GAS URL未設定');
-    return;
-  }
   const cache=getCache();
   if(cache&&!force&&Date.now()-cache.fetchedAt<TTL_MS){
     DATA=cache.data; setStatus('#6ee7b7','キャッシュ'); boot(); return;
@@ -175,63 +190,59 @@ async function loadData(force=false){
   }catch(e){
     if(!cache){
       document.getElementById('overlay').style.display='flex';
-      document.getElementById('overlay').innerHTML=`<div class="err-box"><strong>⚠️ データ取得失敗</strong>GAS URLを確認してください。<br><code>${GAS_URL}</code><br><br>エラー: ${e.message}</div>`;
+      document.getElementById('overlay').innerHTML=`<div class="err-box"><strong>⚠️ データ取得失敗</strong><br><code>${GAS_URL}</code><br><br>${e.message}</div>`;
       setStatus('#fca5a5','読み込み失敗');
-    }else{
-      setStatus('#fca5a5','オフライン');
-    }
+    }else{ setStatus('#fca5a5','オフライン'); }
   }finally{ fetching=false; }
+}
+
+// ── ヘッダーピルのX位置更新 ──
+function updateHeaders(){
+  document.querySelectorAll('.role-pill').forEach((pill,ri)=>{
+    const boardX=PAD_L+ri*(COL_W+COL_GAP);
+    pill.style.left=(tx+boardX*sc)+'px';
+    pill.style.width=(COL_W*sc)+'px';
+    pill.style.transform=`scale(${1/sc})`;
+  });
 }
 
 // ── ズーム / パン ──
 let sc=1,tx=0,ty=0;
 const wrap=document.getElementById('board-wrap');
 const board=document.getElementById('board');
-function applyT(){board.style.transform=`translate(${tx}px,${ty}px) scale(${sc})`;}
-function updateCardScales(){const inv=1/sc;document.querySelectorAll('.tcard').forEach(el=>{el.style.transform=`scale(${inv})`;el.style.transformOrigin='top left';});}
-function zoom(f,cx,cy){const ns=clamp(sc*f,0.03,8);tx=cx-(cx-tx)*ns/sc;ty=cy-(cy-ty)*ns/sc;sc=ns;applyT();updateCardScales();}
+function applyT(){board.style.transform=`translate(${tx}px,${ty}px) scale(${sc})`;updateHeaders();}
+function zoom(f,cx,cy){const ns=clamp(sc*f,0.03,8);tx=cx-(cx-tx)*ns/sc;ty=cy-(cy-ty)*ns/sc;sc=ns;applyT();}
 function doZoomBtn(f){const r=wrap.getBoundingClientRect();zoom(f,r.width/2,r.height/2);}
 wrap.addEventListener('wheel',e=>{e.preventDefault();const r=wrap.getBoundingClientRect();zoom(e.deltaY<0?1.06:1/1.06,e.clientX-r.left,e.clientY-r.top);},{passive:false});
 
-function cardKey(sectionTitle,taskTitle){return `${sectionTitle}__${taskTitle}`;}
-
-let saveTotal=0, saveDone=0;
+// 保存進捗
+let saveTotal=0,saveDone=0;
 function updateSaveStatus(){
   if(saveTotal===0) return;
-  if(saveDone<saveTotal){
-    setStatus('#f59e0b',`保存中... ${saveDone}/${saveTotal}`,true);
-  }else{
-    setStatus('#6ee7b7',`保存完了 ${saveTotal}件 ✓`);
-    setTimeout(()=>{saveTotal=0;saveDone=0;setStatus('#6ee7b7','保存済み');},2000);
-  }
+  if(saveDone<saveTotal) setStatus('#f59e0b',`保存中... ${saveDone}/${saveTotal}`,true);
+  else{ setStatus('#6ee7b7',`保存完了 ${saveTotal}件 ✓`); setTimeout(()=>{saveTotal=0;saveDone=0;setStatus('#6ee7b7','保存済み');},2000); }
 }
 async function saveCardPos(key,left,top){
-  saveTotal++;
-  updateSaveStatus();
-  try{
-    await fetch(`${GAS_URL}?action=save&key=${encodeURIComponent(key)}&left=${left}&top=${top}`);
-  }catch(e){
-    console.warn('save failed',e);
-    setStatus('#fca5a5','保存失敗');
-  }finally{
-    saveDone++;
-    updateSaveStatus();
-  }
+  saveTotal++; updateSaveStatus();
+  try{ await fetch(`${GAS_URL}?action=save&key=${encodeURIComponent(key)}&left=${left}&top=${top}`); }
+  catch(e){ console.warn('save failed',e); setStatus('#fca5a5','保存失敗'); }
+  finally{ saveDone++; updateSaveStatus(); }
 }
+function cardKey(sec,title){return `${sec}__${title}`;}
 
-let drag=false,mx0,my0,tx0,ty0;
-let cardDrag=null;
+// パン・カードドラッグ
+let drag=false,mx0,my0,tx0,ty0,cardDrag=null;
 wrap.addEventListener('mousedown',e=>{if(e.target.closest('.tcard'))return;drag=true;mx0=e.clientX;my0=e.clientY;tx0=tx;ty0=ty;wrap.classList.add('grabbing');});
 window.addEventListener('mousemove',e=>{
   if(drag){tx=tx0+(e.clientX-mx0);ty=ty0+(e.clientY-my0);applyT();}
   if(cardDrag){
-    const dx=(e.clientX-cardDrag.sx)/sc, dy=(e.clientY-cardDrag.sy)/sc;
+    const dx=(e.clientX-cardDrag.sx)/sc,dy=(e.clientY-cardDrag.sy)/sc;
     if(Math.abs(dx)>3||Math.abs(dy)>3) cardDrag.moved=true;
     if(cardDrag.moved){
       cardDrag.el.style.left=(cardDrag.ox+dx)+'px';
       cardDrag.el.style.top=(cardDrag.oy+dy)+'px';
       cardDrag.el.style.zIndex=1000;
-      cardDrag.el.style.boxShadow='0 8px 24px rgba(0,0,0,0.25)';
+      cardDrag.el.style.boxShadow='0 8px 24px rgba(74,157,150,0.3)';
     }
   }
 });
@@ -239,25 +250,23 @@ window.addEventListener('mouseup',()=>{
   drag=false; wrap.classList.remove('grabbing');
   if(cardDrag){
     if(cardDrag.moved){
-      const left=parseFloat(cardDrag.el.style.left), top=parseFloat(cardDrag.el.style.top);
+      const left=parseFloat(cardDrag.el.style.left),top=parseFloat(cardDrag.el.style.top);
       cardDrag.el.style.boxShadow='';
-      // GASに保存 & キャッシュ更新
-      saveCardPos(cardDrag.key, left, top);
+      saveCardPos(cardDrag.key,left,top);
       if(DATA.positions) DATA.positions[cardDrag.key]={left,top};
-      putCache({data:DATA, fetchedAt:Date.now()});
-    }else{
-      showDetail(cardDrag.task, cardDrag.sectionTitle);
-    }
+      putCache({data:DATA,fetchedAt:Date.now()});
+    }else{ showDetail(cardDrag.task,cardDrag.sectionTitle); }
     cardDrag=null;
   }
 });
 
+// タッチ
 let tpts={},pinch0=null,ppan=null;
 wrap.addEventListener('touchstart',e=>{e.preventDefault();for(const t of e.changedTouches)tpts[t.identifier]=[t.clientX,t.clientY];const ids=Object.keys(tpts);if(ids.length===1){const[cx,cy]=tpts[ids[0]];ppan={cx,cy,tx0:tx,ty0:ty};}else if(ids.length>=2){const[a,b]=ids.slice(0,2).map(id=>tpts[id]);const r=wrap.getBoundingClientRect();pinch0={d:Math.hypot(b[0]-a[0],b[1]-a[1]),sc0:sc,tx0:tx,ty0:ty,mx:(a[0]+b[0])/2-r.left,my:(a[1]+b[1])/2-r.top};ppan=null;}},{passive:false});
 wrap.addEventListener('touchmove',e=>{e.preventDefault();for(const t of e.changedTouches)tpts[t.identifier]=[t.clientX,t.clientY];const ids=Object.keys(tpts);if(ids.length===1&&ppan){const[cx,cy]=tpts[ids[0]];tx=ppan.tx0+cx-ppan.cx;ty=ppan.ty0+cy-ppan.cy;applyT();}else if(ids.length>=2&&pinch0){const[a,b]=ids.slice(0,2).map(id=>tpts[id]);const d=Math.hypot(b[0]-a[0],b[1]-a[1]);const ns=clamp(pinch0.sc0*d/pinch0.d,0.03,8);tx=pinch0.mx-(pinch0.mx-pinch0.tx0)*ns/pinch0.sc0;ty=pinch0.my-(pinch0.my-pinch0.ty0)*ns/pinch0.sc0;sc=ns;applyT();}},{passive:false});
 wrap.addEventListener('touchend',e=>{for(const t of e.changedTouches)delete tpts[t.identifier];pinch0=null;const ids=Object.keys(tpts);if(ids.length===1)ppan={cx:tpts[ids[0]][0],cy:tpts[ids[0]][1],tx0:tx,ty0:ty};},{passive:false});
 
-// ── 詳細パネル ──
+// 詳細パネル
 function showDetail(task,sectionTitle){
   document.getElementById('d-title').textContent=task.title;
   document.getElementById('d-section').textContent=sectionTitle;
@@ -270,113 +279,83 @@ function showDetail(task,sectionTitle){
 function closeDetail(){document.getElementById('detail').style.display='none';}
 
 // ── ボード構築 ──
-function boardSize(){
-  const roles=DATA.roles||[];
-  const secs=DATA.sections||[];
-  const bw=PAD_L+LANE_LABEL_W+secs.length*(SECTION_W+SECTION_GAP)-SECTION_GAP+PAD_R;
-  const bh=PAD_T+SECTION_HDR_H+roles.length*LANE_H+PAD_B;
-  return {bw,bh};
-}
 function fitView(){
-  if(!DATA||!DATA.sections) return;
-  const vw=wrap.clientWidth, vh=wrap.clientHeight;
-  const {bw,bh}=boardSize();
+  if(!DATA||!DATA.roles) return;
+  const vw=wrap.clientWidth,vh=wrap.clientHeight;
+  const bw=PAD_L+DATA.roles.length*(COL_W+COL_GAP)-COL_GAP+PAD_R;
+  let bh=PAD_T;
+  (DATA.sections||[]).forEach(s=>{bh+=SEC_HDR_H+SEC_HDR_MB+s.tasks.length*ROW_H;});
+  bh+=PAD_B;
   sc=Math.min(vw/bw,vh/bh)*0.93;
-  tx=(vw-bw*sc)/2; ty=(vh-bh*sc)/2;
-  applyT(); updateCardScales();
+  tx=(vw-bw*sc)/2; ty=0;
+  applyT();
 }
 
 function boot(){
   document.getElementById('overlay').style.display='none';
   if(!DATA||!DATA.sections||!DATA.sections.length){
     document.getElementById('overlay').style.display='flex';
-    document.getElementById('overlay').innerHTML='<div class="err-box"><strong>データがありません</strong>GASが正しく動作しているか確認してください。</div>';
+    document.getElementById('overlay').innerHTML='<div class="err-box"><strong>データがありません</strong></div>';
     return;
   }
-  board.innerHTML='';
   const roles=DATA.roles||[];
-  const secs=DATA.sections;
-  const {bw,bh}=boardSize();
+  const positions=DATA.positions||{};
+  const totalColW=roles.length*(COL_W+COL_GAP)-COL_GAP;
 
-  // SVGグリッド
-  const svg=[`<svg width="${bw}" height="${bh}" xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;pointer-events:none">`];
-  svg.push(`<rect width="${bw}" height="${bh}" fill="#f5f5f3"/>`);
-  // レーン背景・区切り線
-  roles.forEach((_,ri)=>{
-    const y=PAD_T+SECTION_HDR_H+ri*LANE_H;
-    const fill=ri%2===0?'rgba(255,255,255,0.7)':'rgba(240,240,238,0.5)';
-    svg.push(`<rect x="${PAD_L+LANE_LABEL_W}" y="${y}" width="${bw-PAD_L-LANE_LABEL_W-PAD_R}" height="${LANE_H}" fill="${fill}"/>`);
-    svg.push(`<line x1="${PAD_L}" y1="${y}" x2="${bw-PAD_R}" y2="${y}" stroke="#e0e0dc" stroke-width="1"/>`);
-  });
-  svg.push(`<line x1="${PAD_L}" y1="${PAD_T+SECTION_HDR_H+roles.length*LANE_H}" x2="${bw-PAD_R}" y2="${PAD_T+SECTION_HDR_H+roles.length*LANE_H}" stroke="#e0e0dc" stroke-width="1"/>`);
-  // ラベル列の区切り
-  svg.push(`<line x1="${PAD_L+LANE_LABEL_W}" y1="${PAD_T}" x2="${PAD_L+LANE_LABEL_W}" y2="${bh-PAD_B}" stroke="#d0d0cc" stroke-width="1"/>`);
-  svg.push('</svg>');
-  board.innerHTML=svg.join('');
-
-  // ロールラベル
-  roles.forEach((role,ri)=>{
-    const y=PAD_T+SECTION_HDR_H+ri*LANE_H;
-    const el=document.createElement('div');
-    el.className='role-label';
-    el.style.cssText=`left:${PAD_L}px;top:${y}px;width:${LANE_LABEL_W}px;height:${LANE_H}px;`;
-    el.textContent=role;
-    board.appendChild(el);
+  // ヘッダーピル生成
+  const headerRow=document.getElementById('header-row');
+  headerRow.innerHTML='';
+  roles.forEach(role=>{
+    const pill=document.createElement('div');
+    pill.className='role-pill';
+    pill.textContent=role;
+    headerRow.appendChild(pill);
   });
 
-  // セクションヘッダー & カード
-  // 同一セル内のスタックカウント用
-  const stackCount={};
-  secs.forEach((sec,si)=>{
+  // ボード
+  board.innerHTML='';
+  let curY=PAD_T;
+
+  DATA.sections.forEach(sec=>{
+    // セクション区切り線＋ラベル
+    const line=document.createElement('div');
+    line.className='sec-line';
+    line.style.cssText=`left:${PAD_L}px;top:${curY+SEC_HDR_H/2}px;width:${totalColW}px;height:1px;`;
+    board.appendChild(line);
+
+    const label=document.createElement('div');
+    label.className='sec-divider';
+    label.style.cssText=`left:${PAD_L}px;top:${curY}px;height:${SEC_HDR_H}px;`;
+    label.textContent=sec.title;
+    board.appendChild(label);
+    curY+=SEC_HDR_H+SEC_HDR_MB;
+
+    // タスクカード
     sec.tasks.forEach(task=>{
       const ri=task.primary.length>0?roles.indexOf(task.primary[0]):-1;
-      const cellKey=`${si}_${ri}`;
-      stackCount[cellKey]=(stackCount[cellKey]||0)+1;
-    });
-  });
-  const stackIdx={};
-
-  secs.forEach((sec,si)=>{
-    const color=COLORS[si%COLORS.length];
-    const sx=PAD_L+LANE_LABEL_W+si*(SECTION_W+SECTION_GAP);
-
-    // セクションヘッダー
-    const lbl=document.createElement('div');
-    lbl.className='sec-label';
-    lbl.style.cssText=`left:${sx}px;top:${PAD_T}px;width:${SECTION_W}px;background:${color};`;
-    lbl.title=sec.title;
-    lbl.textContent=sec.title;
-    board.appendChild(lbl);
-
-    // カード
-    sec.tasks.forEach(task=>{
-      const ri=task.primary.length>0?roles.indexOf(task.primary[0]):-1;
-      const cellKey=`${si}_${ri}`;
-      const idx=stackIdx[cellKey]=(stackIdx[cellKey]||0);
-      stackIdx[cellKey]++;
-
-      // デフォルト位置：セル内に上から積み上げ
-      const laneTop=ri>=0?PAD_T+SECTION_HDR_H+ri*LANE_H:PAD_T+SECTION_HDR_H+roles.length*LANE_H;
-      const defaultX=sx+(SECTION_W-CARD_W)/2;
-      const defaultY=laneTop+8+idx*(CARD_H+CARD_GAP);
-
+      const colX=PAD_L+(ri>=0?ri*(COL_W+COL_GAP):roles.length*(COL_W+COL_GAP));
+      const defaultX=colX+(COL_W-CARD_W)/2;
+      const defaultY=curY+(ROW_H-CARD_H)/2;
       const key=cardKey(sec.title,task.title);
-      const saved=(DATA.positions||{})[key];
+      const saved=positions[key];
+
       const el=document.createElement('div');
       el.className='tcard';
-      el.style.cssText=`left:${saved?saved.left:defaultX}px;top:${saved?saved.top:defaultY}px;border-left-color:${color};`;
-      const sup=task.support.length?`<div class="sup">○ ${task.support.join(' ')}</div>`:'';
-      el.innerHTML=`<div class="ct">${task.title}</div><div class="cp">${sup}</div>`;
+      el.style.cssText=`left:${saved?saved.left:defaultX}px;top:${saved?saved.top:defaultY}px;width:${CARD_W}px;`;
+      const sup=task.support.length?`<div class="cp">○ ${task.support.join(' ')}</div>`:'';
+      el.innerHTML=`<div class="ct">${task.title}</div>${sup}`;
       el.addEventListener('mousedown',e=>{
         e.stopPropagation();
         cardDrag={el,task,sectionTitle:sec.title,key,sx:e.clientX,sy:e.clientY,ox:parseFloat(el.style.left),oy:parseFloat(el.style.top),moved:false};
       });
       el.addEventListener('touchend',e=>{e.stopPropagation();e.preventDefault();showDetail(task,sec.title);},{passive:false});
       board.appendChild(el);
+      curY+=ROW_H;
     });
   });
+
   fitView();
-  updateCardScales();
+  updateHeaders();
 }
 
 loadData();
