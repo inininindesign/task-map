@@ -61,16 +61,33 @@
 
     /* タスクカード */
     .tcard {
-      position: absolute; background: white;
+      position: absolute; background: white; z-index: 10;
       border-radius: 8px; border: 2px solid #4a9d96;
       padding: 7px 10px;
       box-shadow: 0 1px 4px rgba(0,0,0,0.07);
-      cursor: pointer; overflow: hidden;
+      cursor: pointer; overflow: visible;
       transition: box-shadow 0.15s;
     }
-    .tcard:hover { box-shadow: 0 4px 14px rgba(74,157,150,0.25); z-index: 50 !important; }
+    .tcard:hover { box-shadow: 0 4px 14px rgba(74,157,150,0.25); z-index: 20 !important; }
+    .tcard.selected { border-color: #2d7a73; box-shadow: 0 0 0 3px rgba(74,157,150,0.3); z-index: 20 !important; }
     .tcard .ct { font-size: 11px; font-weight: 600; color: #1a3a38; line-height: 1.4; }
     .tcard .cp { font-size: 9px; color: #999; margin-top: 3px; line-height: 1.4; }
+
+    /* コネクタハンドル */
+    .card-handle {
+      position: absolute; width: 12px; height: 12px;
+      background: #4a9d96; border: 2px solid white;
+      border-radius: 50%; cursor: crosshair;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.15s, transform 0.1s;
+      z-index: 30;
+    }
+    .card-handle:hover { transform: scale(1.4); }
+    .tcard.selected .card-handle { opacity: 1; pointer-events: all; }
+    .card-handle.h-top    { top: -6px;             left: calc(50% - 6px); }
+    .card-handle.h-right  { left: calc(100% - 6px); top: calc(50% - 6px); }
+    .card-handle.h-bottom { top: calc(100% - 6px);  left: calc(50% - 6px); }
+    .card-handle.h-left   { left: -6px;             top: calc(50% - 6px); }
 
     /* セクション区切り */
     .sec-divider {
@@ -111,7 +128,7 @@
     .err-box strong { display: block; margin-bottom: 8px; font-size: 1rem; }
     .err-box code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 0.82rem; word-break: break-all; }
   </style>
-<!-- deploy:1775135960 --></head>
+<!-- deploy:1775136924 --></head>
 <body>
 
 <div id="toolbar">
@@ -212,7 +229,7 @@ function zoom(f,cx,cy){const ns=clamp(sc*f,0.03,8);tx=cx-(cx-tx)*ns/sc;ty=cy-(cy
 function doZoomBtn(f){const r=wrap.getBoundingClientRect();zoom(f,r.width/2,r.height/2);}
 wrap.addEventListener('wheel',e=>{e.preventDefault();const r=wrap.getBoundingClientRect();zoom(e.deltaY<0?1.06:1/1.06,e.clientX-r.left,e.clientY-r.top);},{passive:false});
 
-// 保存進捗
+// ── カード位置保存 ──
 let saveTotal=0,saveDone=0;
 function updateSaveStatus(){
   if(saveTotal===0) return;
@@ -227,9 +244,107 @@ async function saveCardPos(key,left,top){
 }
 function cardKey(sec,title){return `${sec}__${title}`;}
 
-// パン・カードドラッグ
+// ── コネクタ ──
+let connections=[];
+let cardEls={};
+let selectedCardKey=null;
+let connDrag=null;   // {fromKey, fromDir, x1, y1}
+let connSvg=null, previewPath=null;
+
+function getHandlePos(key,dir){
+  const el=cardEls[key];
+  if(!el) return null;
+  const l=parseFloat(el.style.left);
+  const t=parseFloat(el.style.top);
+  const w=CARD_W, h=el.offsetHeight;
+  switch(dir){
+    case 'top':    return {x:l+w/2, y:t};
+    case 'right':  return {x:l+w,   y:t+h/2};
+    case 'bottom': return {x:l+w/2, y:t+h};
+    case 'left':   return {x:l,     y:t+h/2};
+  }
+}
+
+function nearestDir(key,px,py){
+  const el=cardEls[key];
+  if(!el) return 'left';
+  const l=parseFloat(el.style.left);
+  const t=parseFloat(el.style.top);
+  const w=CARD_W, h=el.offsetHeight;
+  const nx=(px-(l+w/2))/(w/2), ny=(py-(t+h/2))/(h/2);
+  if(Math.abs(nx)>Math.abs(ny)) return nx>0?'right':'left';
+  return ny>0?'bottom':'top';
+}
+
+function connPathD(x1,y1,dir1,x2,y2,dir2){
+  const dist=Math.hypot(x2-x1,y2-y1);
+  const tension=Math.max(50,dist*0.4);
+  const off={top:[0,-1],right:[1,0],bottom:[0,1],left:[-1,0]};
+  const [dx1,dy1]=off[dir1]||[1,0];
+  const [dx2,dy2]=off[dir2]||[-1,0];
+  return `M${x1},${y1} C${x1+dx1*tension},${y1+dy1*tension} ${x2+dx2*tension},${y2+dy2*tension} ${x2},${y2}`;
+}
+
+function redrawConnections(){
+  if(!connSvg) return;
+  document.querySelectorAll('.conn-path').forEach(el=>el.remove());
+  connections.forEach((conn,i)=>{
+    const p1=getHandlePos(conn.from,conn.fromDir);
+    const p2=getHandlePos(conn.to,conn.toDir);
+    if(!p1||!p2) return;
+    const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d',connPathD(p1.x,p1.y,conn.fromDir,p2.x,p2.y,conn.toDir));
+    path.setAttribute('class','conn-path');
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke','#4a9d96');
+    path.setAttribute('stroke-width','2');
+    path.setAttribute('marker-end','url(#arrowhead)');
+    path.style.pointerEvents='stroke';
+    path.style.cursor='pointer';
+    path.dataset.idx=i;
+    path.addEventListener('contextmenu',e=>{
+      e.preventDefault();
+      connections.splice(parseInt(e.currentTarget.dataset.idx),1);
+      if(DATA){DATA.connections=connections;putCache({data:DATA,fetchedAt:Date.now()});}
+      redrawConnections();
+      saveConns();
+    });
+    connSvg.insertBefore(path,previewPath);
+  });
+}
+
+async function saveConns(){
+  setStatus('#f59e0b','接続保存中...',true);
+  try{
+    await fetch(`${GAS_URL}?action=saveConns&data=${encodeURIComponent(JSON.stringify(connections))}`);
+    if(DATA){DATA.connections=connections;putCache({data:DATA,fetchedAt:Date.now()});}
+    setStatus('#6ee7b7','保存済み');
+  }catch(e){
+    console.warn('saveConns failed',e);
+    setStatus('#fca5a5','保存失敗');
+  }
+}
+
+function selectCard(key){
+  if(selectedCardKey&&cardEls[selectedCardKey]) cardEls[selectedCardKey].classList.remove('selected');
+  if(selectedCardKey===key){selectedCardKey=null;return;}
+  selectedCardKey=key;
+  if(cardEls[key]) cardEls[key].classList.add('selected');
+}
+
+function deselectAll(){
+  if(selectedCardKey&&cardEls[selectedCardKey]) cardEls[selectedCardKey].classList.remove('selected');
+  selectedCardKey=null;
+}
+
+// ── パン・カードドラッグ ──
 let drag=false,mx0,my0,tx0,ty0,cardDrag=null;
-wrap.addEventListener('mousedown',e=>{if(e.target.closest('.tcard'))return;drag=true;mx0=e.clientX;my0=e.clientY;tx0=tx;ty0=ty;wrap.classList.add('grabbing');});
+wrap.addEventListener('mousedown',e=>{
+  if(e.target.closest('.tcard')) return;
+  deselectAll();
+  drag=true;mx0=e.clientX;my0=e.clientY;tx0=tx;ty0=ty;wrap.classList.add('grabbing');
+});
+
 window.addEventListener('mousemove',e=>{
   if(drag){tx=tx0+(e.clientX-mx0);ty=ty0+(e.clientY-my0);applyT();}
   if(cardDrag){
@@ -240,30 +355,59 @@ window.addEventListener('mousemove',e=>{
       cardDrag.el.style.top=(cardDrag.oy+dy)+'px';
       cardDrag.el.style.zIndex=1000;
       cardDrag.el.style.boxShadow='0 8px 24px rgba(74,157,150,0.3)';
+      redrawConnections();
     }
   }
+  if(connDrag&&previewPath){
+    const r=wrap.getBoundingClientRect();
+    const bx=(e.clientX-r.left-tx)/sc;
+    const by=(e.clientY-r.top-ty)/sc;
+    previewPath.setAttribute('d',connPathD(connDrag.x1,connDrag.y1,connDrag.fromDir,bx,by,'left'));
+    previewPath.style.display='';
+  }
 });
-window.addEventListener('mouseup',()=>{
+
+window.addEventListener('mouseup',e=>{
   drag=false; wrap.classList.remove('grabbing');
   if(cardDrag){
     if(cardDrag.moved){
       const left=parseFloat(cardDrag.el.style.left),top=parseFloat(cardDrag.el.style.top);
       cardDrag.el.style.boxShadow='';
+      cardDrag.el.style.zIndex='';
       saveCardPos(cardDrag.key,left,top);
       if(DATA.positions) DATA.positions[cardDrag.key]={left,top};
       putCache({data:DATA,fetchedAt:Date.now()});
-    }else{ showDetail(cardDrag.task,cardDrag.sectionTitle); }
+      redrawConnections();
+    }else{
+      selectCard(cardDrag.key);
+    }
     cardDrag=null;
+  }
+  if(connDrag){
+    if(previewPath) previewPath.style.display='none';
+    const target=e.target.closest('.tcard');
+    if(target&&target.dataset.key&&target.dataset.key!==connDrag.fromKey){
+      const toKey=target.dataset.key;
+      const r=wrap.getBoundingClientRect();
+      const bx=(e.clientX-r.left-tx)/sc;
+      const by=(e.clientY-r.top-ty)/sc;
+      const toDir=nearestDir(toKey,bx,by);
+      connections.push({from:connDrag.fromKey,fromDir:connDrag.fromDir,to:toKey,toDir});
+      if(DATA){DATA.connections=connections;putCache({data:DATA,fetchedAt:Date.now()});}
+      redrawConnections();
+      saveConns();
+    }
+    connDrag=null;
   }
 });
 
-// タッチ
+// ── タッチ ──
 let tpts={},pinch0=null,ppan=null;
 wrap.addEventListener('touchstart',e=>{e.preventDefault();for(const t of e.changedTouches)tpts[t.identifier]=[t.clientX,t.clientY];const ids=Object.keys(tpts);if(ids.length===1){const[cx,cy]=tpts[ids[0]];ppan={cx,cy,tx0:tx,ty0:ty};}else if(ids.length>=2){const[a,b]=ids.slice(0,2).map(id=>tpts[id]);const r=wrap.getBoundingClientRect();pinch0={d:Math.hypot(b[0]-a[0],b[1]-a[1]),sc0:sc,tx0:tx,ty0:ty,mx:(a[0]+b[0])/2-r.left,my:(a[1]+b[1])/2-r.top};ppan=null;}},{passive:false});
 wrap.addEventListener('touchmove',e=>{e.preventDefault();for(const t of e.changedTouches)tpts[t.identifier]=[t.clientX,t.clientY];const ids=Object.keys(tpts);if(ids.length===1&&ppan){const[cx,cy]=tpts[ids[0]];tx=ppan.tx0+cx-ppan.cx;ty=ppan.ty0+cy-ppan.cy;applyT();}else if(ids.length>=2&&pinch0){const[a,b]=ids.slice(0,2).map(id=>tpts[id]);const d=Math.hypot(b[0]-a[0],b[1]-a[1]);const ns=clamp(pinch0.sc0*d/pinch0.d,0.03,8);tx=pinch0.mx-(pinch0.mx-pinch0.tx0)*ns/pinch0.sc0;ty=pinch0.my-(pinch0.my-pinch0.ty0)*ns/pinch0.sc0;sc=ns;applyT();}},{passive:false});
 wrap.addEventListener('touchend',e=>{for(const t of e.changedTouches)delete tpts[t.identifier];pinch0=null;const ids=Object.keys(tpts);if(ids.length===1)ppan={cx:tpts[ids[0]][0],cy:tpts[ids[0]][1],tx0:tx,ty0:ty};},{passive:false});
 
-// 詳細パネル
+// ── 詳細パネル（ダブルクリック） ──
 function showDetail(task,sectionTitle){
   document.getElementById('d-title').textContent=task.title;
   document.getElementById('d-section').textContent=sectionTitle;
@@ -297,6 +441,11 @@ function boot(){
   }
   const roles=DATA.roles||[];
   const positions=DATA.positions||{};
+  connections=DATA.connections||[];
+  cardEls={};
+  selectedCardKey=null;
+  connDrag=null;
+
   const totalColW=roles.length*COL_W;
 
   // ヘッダーピル生成
@@ -312,10 +461,40 @@ function boot(){
   // ボード
   board.innerHTML='';
 
-  // 総高さを計算
+  // 総高さ計算
   let totalH=PAD_T;
   DATA.sections.forEach(s=>{totalH+=SEC_HDR_H+SEC_HDR_MB+s.tasks.length*ROW_H;});
   totalH+=PAD_B;
+
+  // SVGレイヤー（コネクタ用）
+  connSvg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  connSvg.setAttribute('width','0');
+  connSvg.setAttribute('height','0');
+  connSvg.style.cssText='position:absolute;top:0;left:0;overflow:visible;z-index:5;';
+  const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
+  const marker=document.createElementNS('http://www.w3.org/2000/svg','marker');
+  marker.setAttribute('id','arrowhead');
+  marker.setAttribute('markerWidth','8');
+  marker.setAttribute('markerHeight','6');
+  marker.setAttribute('refX','7');
+  marker.setAttribute('refY','3');
+  marker.setAttribute('orient','auto');
+  const arrowPoly=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+  arrowPoly.setAttribute('points','0 0, 8 3, 0 6');
+  arrowPoly.setAttribute('fill','#4a9d96');
+  marker.appendChild(arrowPoly);
+  defs.appendChild(marker);
+  connSvg.appendChild(defs);
+  previewPath=document.createElementNS('http://www.w3.org/2000/svg','path');
+  previewPath.setAttribute('fill','none');
+  previewPath.setAttribute('stroke','#4a9d96');
+  previewPath.setAttribute('stroke-width','2');
+  previewPath.setAttribute('stroke-dasharray','6,4');
+  previewPath.setAttribute('marker-end','url(#arrowhead)');
+  previewPath.style.display='none';
+  previewPath.style.pointerEvents='none';
+  connSvg.appendChild(previewPath);
+  board.appendChild(connSvg);
 
   // 縦線（スイムレーン区切り）
   for(let ri=1;ri<roles.length;ri++){
@@ -328,7 +507,6 @@ function boot(){
   let curY=PAD_T;
 
   DATA.sections.forEach(sec=>{
-    // セクション区切り線＋ラベル
     const line=document.createElement('div');
     line.className='sec-line';
     line.style.cssText=`left:${PAD_L}px;top:${curY+SEC_HDR_H/2}px;width:${totalColW}px;height:1px;`;
@@ -341,7 +519,6 @@ function boot(){
     board.appendChild(label);
     curY+=SEC_HDR_H+SEC_HDR_MB;
 
-    // タスクカード
     sec.tasks.forEach(task=>{
       const ri=task.primary.length>0?roles.indexOf(task.primary[0]):-1;
       const colX=PAD_L+(ri>=0?ri*COL_W:roles.length*COL_W);
@@ -352,21 +529,43 @@ function boot(){
 
       const el=document.createElement('div');
       el.className='tcard';
+      el.dataset.key=key;
       el.style.cssText=`left:${saved?saved.left:defaultX}px;top:${saved?saved.top:defaultY}px;width:${CARD_W}px;`;
       const sup=task.support.length?`<div class="cp">○ ${task.support.join(' ')}</div>`:'';
       el.innerHTML=`<div class="ct">${task.title}</div>${sup}`;
+
+      // コネクタハンドル（四方向）
+      ['top','right','bottom','left'].forEach(dir=>{
+        const handle=document.createElement('div');
+        handle.className=`card-handle h-${dir}`;
+        handle.addEventListener('mousedown',ev=>{
+          ev.stopPropagation();
+          ev.preventDefault();
+          const pos=getHandlePos(key,dir);
+          if(pos) connDrag={fromKey:key,fromDir:dir,x1:pos.x,y1:pos.y};
+        });
+        el.appendChild(handle);
+      });
+
       el.addEventListener('mousedown',e=>{
         e.stopPropagation();
         cardDrag={el,task,sectionTitle:sec.title,key,sx:e.clientX,sy:e.clientY,ox:parseFloat(el.style.left),oy:parseFloat(el.style.top),moved:false};
       });
+      el.addEventListener('dblclick',e=>{
+        e.stopPropagation();
+        showDetail(task,sec.title);
+      });
       el.addEventListener('touchend',e=>{e.stopPropagation();e.preventDefault();showDetail(task,sec.title);},{passive:false});
+
       board.appendChild(el);
+      cardEls[key]=el;
       curY+=ROW_H;
     });
   });
 
   fitView();
   updateHeaders();
+  redrawConnections();
 }
 
 loadData();
