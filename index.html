@@ -84,7 +84,7 @@
     .err-box strong { display: block; margin-bottom: 8px; font-size: 1rem; color: #1a1a2e; }
     .err-box code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 0.82rem; word-break: break-all; }
   </style>
-<!-- deploy:1775131998 --></head>
+<!-- deploy:1775132250 --></head>
 <body>
 
 <div id="toolbar">
@@ -187,8 +187,29 @@ function doZoomBtn(f){const r=wrap.getBoundingClientRect();zoom(f,r.width/2,r.he
 wrap.addEventListener('wheel',e=>{e.preventDefault();const r=wrap.getBoundingClientRect();zoom(e.deltaY<0?1.12:1/1.12,e.clientX-r.left,e.clientY-r.top);},{passive:false});
 
 function cardKey(sectionTitle,taskTitle){return `${sectionTitle}__${taskTitle}`;}
+
+let saveTotal=0, saveDone=0;
+function updateSaveStatus(){
+  if(saveTotal===0) return;
+  if(saveDone<saveTotal){
+    setStatus('#f59e0b',`保存中... ${saveDone}/${saveTotal}`,true);
+  }else{
+    setStatus('#6ee7b7',`保存完了 ${saveTotal}件 ✓`);
+    setTimeout(()=>{saveTotal=0;saveDone=0;setStatus('#6ee7b7','保存済み');},2000);
+  }
+}
 async function saveCardPos(key,left,top){
-  try{await fetch(`${GAS_URL}?action=save&key=${encodeURIComponent(key)}&left=${left}&top=${top}`);}catch(e){console.warn('save failed',e);}
+  saveTotal++;
+  updateSaveStatus();
+  try{
+    await fetch(`${GAS_URL}?action=save&key=${encodeURIComponent(key)}&left=${left}&top=${top}`);
+  }catch(e){
+    console.warn('save failed',e);
+    setStatus('#fca5a5','保存失敗');
+  }finally{
+    saveDone++;
+    updateSaveStatus();
+  }
 }
 
 let drag=false,mx0,my0,tx0,ty0;
@@ -217,7 +238,6 @@ window.addEventListener('mouseup',()=>{
       saveCardPos(cardDrag.key, left, top);
       if(DATA.positions) DATA.positions[cardDrag.key]={left,top};
       putCache({data:DATA, fetchedAt:Date.now()});
-      setStatus('#6ee7b7','位置を保存中...');
     }else{
       showDetail(cardDrag.task, cardDrag.sectionTitle);
     }
