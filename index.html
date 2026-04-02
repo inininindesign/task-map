@@ -42,22 +42,27 @@
 
     .sec-label {
       position: absolute; font-size: 11px; font-weight: 700; color: white;
-      padding: 6px 10px; border-radius: 6px;
+      padding: 5px 8px; border-radius: 5px;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
 
+    .role-label {
+      position: absolute; font-size: 10px; font-weight: 700; color: #777;
+      display: flex; align-items: center; padding: 0 8px;
+      border-right: 1px solid #e0e0dc;
+    }
+
     .tcard {
-      position: absolute; background: white; border-radius: 5px;
-      padding: 6px 8px; width: 180px;
-      box-shadow: 0 1px 5px rgba(0,0,0,0.10);
+      position: absolute; background: white; border-radius: 4px;
+      padding: 5px 7px; width: 148px; height: 40px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.10);
       cursor: pointer; border-left: 3px solid #ddd;
-      transition: box-shadow 0.15s;
+      transition: box-shadow 0.15s; overflow: hidden;
     }
     .tcard:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.18); z-index: 50 !important; }
-    .tcard .ct { font-size: 10px; font-weight: 700; color: #1a1a2e; line-height: 1.4; margin-bottom: 4px; max-height: 28px; overflow: hidden; }
-    .tcard .cp { font-size: 9px; line-height: 1.6; }
-    .tcard .pri { color: #e94560; }
-    .tcard .sup { color: #888; }
+    .tcard .ct { font-size: 10px; font-weight: 700; color: #1a1a2e; line-height: 1.3; max-height: 26px; overflow: hidden; }
+    .tcard .cp { font-size: 8px; line-height: 1.4; margin-top: 2px; }
+    .tcard .sup { color: #999; }
 
     #detail {
       position: fixed; right: 16px; top: 66px; width: 260px;
@@ -84,7 +89,7 @@
     .err-box strong { display: block; margin-bottom: 8px; font-size: 1rem; color: #1a1a2e; }
     .err-box code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 0.82rem; word-break: break-all; }
   </style>
-<!-- deploy:1775132402 --></head>
+<!-- deploy:1775132755 --></head>
 <body>
 
 <div id="toolbar">
@@ -116,20 +121,21 @@
 
 <script>
 const GAS_URL   = 'https://script.google.com/macros/s/AKfycbwhOvw4xINmgtzSKBJBI1FkfdGmhlnRGU9djtF1pl-iiGBbk9E5KaC59RIe4avVFtiH/exec'; // ← GASデプロイ後にここを更新
-const CACHE_KEY = 'taskmap_v1';
+const CACHE_KEY = 'taskmap_v2';
 const TTL_MS    = 30 * 60 * 1000;
 
-const CARD_W   = 180;
-const CARD_H   = 68;
-const CARD_GAP = 8;
-const COL_W    = 200;
-const COL_GAP  = 40;
-const HDR_H    = 32;
-const HDR_MB   = 10;
-const PAD_T    = 24;
-const PAD_L    = 24;
-const PAD_B    = 48;
-const PAD_R    = 40;
+const CARD_W        = 148;
+const CARD_H        = 40;
+const CARD_GAP      = 6;
+const SECTION_W     = 164;
+const SECTION_GAP   = 12;
+const SECTION_HDR_H = 34;
+const LANE_LABEL_W  = 88;
+const LANE_H        = 120;
+const PAD_T         = 16;
+const PAD_L         = 16;
+const PAD_B         = 40;
+const PAD_R         = 40;
 
 const COLORS = ['#4e9af1','#f59e0b','#10b981','#e94560','#8b5cf6','#06b6d4','#f97316','#ec4899','#64748b','#84cc16'];
 
@@ -263,13 +269,17 @@ function showDetail(task,sectionTitle){
 function closeDetail(){document.getElementById('detail').style.display='none';}
 
 // ── ボード構築 ──
+function boardSize(){
+  const roles=DATA.roles||[];
+  const secs=DATA.sections||[];
+  const bw=PAD_L+LANE_LABEL_W+secs.length*(SECTION_W+SECTION_GAP)-SECTION_GAP+PAD_R;
+  const bh=PAD_T+SECTION_HDR_H+roles.length*LANE_H+PAD_B;
+  return {bw,bh};
+}
 function fitView(){
   if(!DATA||!DATA.sections) return;
   const vw=wrap.clientWidth, vh=wrap.clientHeight;
-  const n=DATA.sections.length;
-  const maxCards=Math.max(...DATA.sections.map(s=>s.tasks.length),1);
-  const bw=PAD_L+n*(COL_W+COL_GAP)-COL_GAP+PAD_R;
-  const bh=PAD_T+HDR_H+HDR_MB+maxCards*(CARD_H+CARD_GAP)+PAD_B;
+  const {bw,bh}=boardSize();
   sc=Math.min(vw/bw,vh/bh)*0.93;
   tx=(vw-bw*sc)/2; ty=(vh-bh*sc)/2;
   applyT(); updateCardScales();
@@ -283,30 +293,79 @@ function boot(){
     return;
   }
   board.innerHTML='';
-  DATA.sections.forEach((sec,si)=>{
+  const roles=DATA.roles||[];
+  const secs=DATA.sections;
+  const {bw,bh}=boardSize();
+
+  // SVGグリッド
+  const svg=[`<svg width="${bw}" height="${bh}" xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;pointer-events:none">`];
+  svg.push(`<rect width="${bw}" height="${bh}" fill="#f5f5f3"/>`);
+  // レーン背景・区切り線
+  roles.forEach((_,ri)=>{
+    const y=PAD_T+SECTION_HDR_H+ri*LANE_H;
+    const fill=ri%2===0?'rgba(255,255,255,0.7)':'rgba(240,240,238,0.5)';
+    svg.push(`<rect x="${PAD_L+LANE_LABEL_W}" y="${y}" width="${bw-PAD_L-LANE_LABEL_W-PAD_R}" height="${LANE_H}" fill="${fill}"/>`);
+    svg.push(`<line x1="${PAD_L}" y1="${y}" x2="${bw-PAD_R}" y2="${y}" stroke="#e0e0dc" stroke-width="1"/>`);
+  });
+  svg.push(`<line x1="${PAD_L}" y1="${PAD_T+SECTION_HDR_H+roles.length*LANE_H}" x2="${bw-PAD_R}" y2="${PAD_T+SECTION_HDR_H+roles.length*LANE_H}" stroke="#e0e0dc" stroke-width="1"/>`);
+  // ラベル列の区切り
+  svg.push(`<line x1="${PAD_L+LANE_LABEL_W}" y1="${PAD_T}" x2="${PAD_L+LANE_LABEL_W}" y2="${bh-PAD_B}" stroke="#d0d0cc" stroke-width="1"/>`);
+  svg.push('</svg>');
+  board.innerHTML=svg.join('');
+
+  // ロールラベル
+  roles.forEach((role,ri)=>{
+    const y=PAD_T+SECTION_HDR_H+ri*LANE_H;
+    const el=document.createElement('div');
+    el.className='role-label';
+    el.style.cssText=`left:${PAD_L}px;top:${y}px;width:${LANE_LABEL_W}px;height:${LANE_H}px;`;
+    el.textContent=role;
+    board.appendChild(el);
+  });
+
+  // セクションヘッダー & カード
+  // 同一セル内のスタックカウント用
+  const stackCount={};
+  secs.forEach((sec,si)=>{
+    sec.tasks.forEach(task=>{
+      const ri=task.primary.length>0?roles.indexOf(task.primary[0]):-1;
+      const cellKey=`${si}_${ri}`;
+      stackCount[cellKey]=(stackCount[cellKey]||0)+1;
+    });
+  });
+  const stackIdx={};
+
+  secs.forEach((sec,si)=>{
     const color=COLORS[si%COLORS.length];
-    const x=PAD_L+si*(COL_W+COL_GAP);
+    const sx=PAD_L+LANE_LABEL_W+si*(SECTION_W+SECTION_GAP);
 
     // セクションヘッダー
     const lbl=document.createElement('div');
     lbl.className='sec-label';
-    lbl.style.cssText=`left:${x}px;top:${PAD_T}px;width:${COL_W}px;background:${color};`;
+    lbl.style.cssText=`left:${sx}px;top:${PAD_T}px;width:${SECTION_W}px;background:${color};`;
     lbl.title=sec.title;
     lbl.textContent=sec.title;
     board.appendChild(lbl);
 
     // カード
-    sec.tasks.forEach((task,ti)=>{
-      const defaultX=x+(COL_W-CARD_W)/2;
-      const defaultY=PAD_T+HDR_H+HDR_MB+ti*(CARD_H+CARD_GAP);
+    sec.tasks.forEach(task=>{
+      const ri=task.primary.length>0?roles.indexOf(task.primary[0]):-1;
+      const cellKey=`${si}_${ri}`;
+      const idx=stackIdx[cellKey]=(stackIdx[cellKey]||0);
+      stackIdx[cellKey]++;
+
+      // デフォルト位置：セル内に上から積み上げ
+      const laneTop=ri>=0?PAD_T+SECTION_HDR_H+ri*LANE_H:PAD_T+SECTION_HDR_H+roles.length*LANE_H;
+      const defaultX=sx+(SECTION_W-CARD_W)/2;
+      const defaultY=laneTop+8+idx*(CARD_H+CARD_GAP);
+
       const key=cardKey(sec.title,task.title);
       const saved=(DATA.positions||{})[key];
       const el=document.createElement('div');
       el.className='tcard';
-      el.style.cssText=`left:${saved?saved.left:defaultX}px;top:${saved?saved.top:defaultY}px;border-left-color:${color};height:${CARD_H}px;`;
-      const pri=task.primary.length?`<div class="pri">◎ ${task.primary.join(' ')}</div>`:'';
+      el.style.cssText=`left:${saved?saved.left:defaultX}px;top:${saved?saved.top:defaultY}px;border-left-color:${color};`;
       const sup=task.support.length?`<div class="sup">○ ${task.support.join(' ')}</div>`:'';
-      el.innerHTML=`<div class="ct">${task.title}</div><div class="cp">${pri}${sup}</div>`;
+      el.innerHTML=`<div class="ct">${task.title}</div><div class="cp">${sup}</div>`;
       el.addEventListener('mousedown',e=>{
         e.stopPropagation();
         cardDrag={el,task,sectionTitle:sec.title,key,sx:e.clientX,sy:e.clientY,ox:parseFloat(el.style.left),oy:parseFloat(el.style.top),moved:false};
