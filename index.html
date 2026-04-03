@@ -59,8 +59,10 @@
     /* SVGオーバーレイ：board-wrap直下、transformなし */
     #conn-svg {
       position: absolute; inset: 0;
+      width: 100%; height: 100%;
       pointer-events: none;
       z-index: 60;
+      overflow: visible;
     }
 
     .tcard {
@@ -116,7 +118,7 @@
     .err-box strong { display: block; margin-bottom: 8px; font-size: 1rem; }
     .err-box code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 0.82rem; word-break: break-all; }
   </style>
-<!-- deploy:1775185174 --></head>
+<!-- deploy:1775191069 --></head>
 <body>
 
 <div id="toolbar">
@@ -133,7 +135,7 @@
 <div id="board-wrap">
   <div id="board"></div>
   <!-- SVGはboardの外：transformに影響されない -->
-  <svg id="conn-svg">
+  <svg id="conn-svg" width="100%" height="100%">
     <defs>
       <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
         <polygon points="0 0, 8 3, 0 6" fill="#4a9d96"/>
@@ -383,7 +385,6 @@ function showHandles(key){
     handle.style.top=hy+'px';
     handle.addEventListener('mousedown',ev=>{
       ev.stopPropagation();
-      ev.preventDefault();
       connDrag={fromKey:key,fromDir:dir};
       wrap.style.cursor='crosshair';
     });
