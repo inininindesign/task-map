@@ -73,21 +73,14 @@
     .tcard .ct { font-size: 11px; font-weight: 600; color: #1a3a38; line-height: 1.4; }
     .tcard .cp { font-size: 9px; color: #999; margin-top: 3px; line-height: 1.4; }
 
-    /* コネクタハンドル */
-    .card-handle {
-      position: absolute; width: 12px; height: 12px;
+    /* コネクタハンドル（ボード直下に配置） */
+    .conn-handle {
+      position: absolute; width: 14px; height: 14px;
       background: #4a9d96; border: 2px solid white;
       border-radius: 50%; cursor: crosshair;
-      opacity: 0; pointer-events: none;
-      transition: opacity 0.15s, transform 0.1s;
-      z-index: 30;
+      z-index: 100; transition: transform 0.1s;
     }
-    .card-handle:hover { transform: scale(1.4); }
-    .tcard.selected .card-handle { opacity: 1; pointer-events: all; }
-    .card-handle.h-top    { top: -6px;             left: calc(50% - 6px); }
-    .card-handle.h-right  { left: calc(100% - 6px); top: calc(50% - 6px); }
-    .card-handle.h-bottom { top: calc(100% - 6px);  left: calc(50% - 6px); }
-    .card-handle.h-left   { left: -6px;             top: calc(50% - 6px); }
+    .conn-handle:hover { transform: scale(1.35); }
 
     /* セクション区切り */
     .sec-divider {
@@ -128,7 +121,7 @@
     .err-box strong { display: block; margin-bottom: 8px; font-size: 1rem; }
     .err-box code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 0.82rem; word-break: break-all; }
   </style>
-<!-- deploy:1775136924 --></head>
+<!-- deploy:1775179682 --></head>
 <body>
 
 <div id="toolbar">
@@ -248,8 +241,9 @@ function cardKey(sec,title){return `${sec}__${title}`;}
 let connections=[];
 let cardEls={};
 let selectedCardKey=null;
-let connDrag=null;   // {fromKey, fromDir, x1, y1}
+let connDrag=null;        // {fromKey, fromDir, x1, y1}
 let connSvg=null, previewPath=null;
+let activeHandles=[];     // handle divs currently in board
 
 function getHandlePos(key,dir){
   const el=cardEls[key];
@@ -325,16 +319,60 @@ async function saveConns(){
   }
 }
 
+function clearHandles(){
+  activeHandles.forEach(h=>h.remove());
+  activeHandles=[];
+}
+
+function showHandles(key){
+  clearHandles();
+  const el=cardEls[key];
+  if(!el||!board.contains(connSvg)) return;
+  const l=parseFloat(el.style.left);
+  const t=parseFloat(el.style.top);
+  const w=CARD_W, h=el.offsetHeight||CARD_H;
+  const pts={top:[l+w/2-7,t-7],right:[l+w-7,t+h/2-7],bottom:[l+w/2-7,t+h-7],left:[l-7,t+h/2-7]};
+  Object.entries(pts).forEach(([dir,[hx,hy]])=>{
+    const handle=document.createElement('div');
+    handle.className='conn-handle';
+    handle.style.left=hx+'px';
+    handle.style.top=hy+'px';
+    handle.addEventListener('mousedown',ev=>{
+      ev.stopPropagation();
+      const pos=getHandlePos(key,dir);
+      if(pos) connDrag={fromKey:key,fromDir:dir,x1:pos.x,y1:pos.y};
+    });
+    board.appendChild(handle);
+    activeHandles.push(handle);
+  });
+}
+
+function updateHandles(key){
+  if(!key||activeHandles.length!==4) return;
+  const el=cardEls[key];
+  if(!el) return;
+  const l=parseFloat(el.style.left);
+  const t=parseFloat(el.style.top);
+  const w=CARD_W, h=el.offsetHeight||CARD_H;
+  const pts=[[l+w/2-7,t-7],[l+w-7,t+h/2-7],[l+w/2-7,t+h-7],[l-7,t+h/2-7]];
+  activeHandles.forEach((handle,i)=>{
+    handle.style.left=pts[i][0]+'px';
+    handle.style.top=pts[i][1]+'px';
+  });
+}
+
 function selectCard(key){
   if(selectedCardKey&&cardEls[selectedCardKey]) cardEls[selectedCardKey].classList.remove('selected');
-  if(selectedCardKey===key){selectedCardKey=null;return;}
+  if(selectedCardKey===key){selectedCardKey=null;clearHandles();return;}
   selectedCardKey=key;
   if(cardEls[key]) cardEls[key].classList.add('selected');
+  showHandles(key);
 }
 
 function deselectAll(){
   if(selectedCardKey&&cardEls[selectedCardKey]) cardEls[selectedCardKey].classList.remove('selected');
   selectedCardKey=null;
+  clearHandles();
 }
 
 // ── パン・カードドラッグ ──
@@ -356,6 +394,7 @@ window.addEventListener('mousemove',e=>{
       cardDrag.el.style.zIndex=1000;
       cardDrag.el.style.boxShadow='0 8px 24px rgba(74,157,150,0.3)';
       redrawConnections();
+      updateHandles(selectedCardKey);
     }
   }
   if(connDrag&&previewPath){
@@ -378,6 +417,7 @@ window.addEventListener('mouseup',e=>{
       if(DATA.positions) DATA.positions[cardDrag.key]={left,top};
       putCache({data:DATA,fetchedAt:Date.now()});
       redrawConnections();
+      updateHandles(selectedCardKey);
     }else{
       selectCard(cardDrag.key);
     }
@@ -533,19 +573,6 @@ function boot(){
       el.style.cssText=`left:${saved?saved.left:defaultX}px;top:${saved?saved.top:defaultY}px;width:${CARD_W}px;`;
       const sup=task.support.length?`<div class="cp">○ ${task.support.join(' ')}</div>`:'';
       el.innerHTML=`<div class="ct">${task.title}</div>${sup}`;
-
-      // コネクタハンドル（四方向）
-      ['top','right','bottom','left'].forEach(dir=>{
-        const handle=document.createElement('div');
-        handle.className=`card-handle h-${dir}`;
-        handle.addEventListener('mousedown',ev=>{
-          ev.stopPropagation();
-          ev.preventDefault();
-          const pos=getHandlePos(key,dir);
-          if(pos) connDrag={fromKey:key,fromDir:dir,x1:pos.x,y1:pos.y};
-        });
-        el.appendChild(handle);
-      });
 
       el.addEventListener('mousedown',e=>{
         e.stopPropagation();
