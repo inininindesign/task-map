@@ -121,7 +121,7 @@
     .err-box strong { display: block; margin-bottom: 8px; font-size: 1rem; }
     .err-box code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 0.82rem; word-break: break-all; }
   </style>
-<!-- deploy:1775179682 --></head>
+<!-- deploy:1775181346 --></head>
 <body>
 
 <div id="toolbar">
@@ -217,7 +217,11 @@ function updateHeaders(){
 let sc=1,tx=0,ty=0;
 const wrap=document.getElementById('board-wrap');
 const board=document.getElementById('board');
-function applyT(){board.style.transform=`translate(${tx}px,${ty}px) scale(${sc})`;updateHeaders();}
+function applyT(){board.style.transform=`translate(${tx}px,${ty}px) scale(${sc})`;updateHeaders();updateHandleScales();}
+function updateHandleScales(){
+  const inv=sc>0?1/sc:1;
+  activeHandles.forEach(h=>{h.style.transform=`scale(${inv})`;h.style.transformOrigin='center center';});
+}
 function zoom(f,cx,cy){const ns=clamp(sc*f,0.03,8);tx=cx-(cx-tx)*ns/sc;ty=cy-(cy-ty)*ns/sc;sc=ns;applyT();}
 function doZoomBtn(f){const r=wrap.getBoundingClientRect();zoom(f,r.width/2,r.height/2);}
 wrap.addEventListener('wheel',e=>{e.preventDefault();const r=wrap.getBoundingClientRect();zoom(e.deltaY<0?1.06:1/1.06,e.clientX-r.left,e.clientY-r.top);},{passive:false});
@@ -327,7 +331,7 @@ function clearHandles(){
 function showHandles(key){
   clearHandles();
   const el=cardEls[key];
-  if(!el||!board.contains(connSvg)) return;
+  if(!el) return;
   const l=parseFloat(el.style.left);
   const t=parseFloat(el.style.top);
   const w=CARD_W, h=el.offsetHeight||CARD_H;
@@ -345,6 +349,7 @@ function showHandles(key){
     board.appendChild(handle);
     activeHandles.push(handle);
   });
+  updateHandleScales();
 }
 
 function updateHandles(key){
@@ -378,7 +383,7 @@ function deselectAll(){
 // ── パン・カードドラッグ ──
 let drag=false,mx0,my0,tx0,ty0,cardDrag=null;
 wrap.addEventListener('mousedown',e=>{
-  if(e.target.closest('.tcard')) return;
+  if(e.target.closest('.tcard')||e.target.classList.contains('conn-handle')) return;
   deselectAll();
   drag=true;mx0=e.clientX;my0=e.clientY;tx0=tx;ty0=ty;wrap.classList.add('grabbing');
 });
@@ -485,6 +490,7 @@ function boot(){
   cardEls={};
   selectedCardKey=null;
   connDrag=null;
+  clearHandles();
 
   const totalColW=roles.length*COL_W;
 
@@ -510,7 +516,7 @@ function boot(){
   connSvg=document.createElementNS('http://www.w3.org/2000/svg','svg');
   connSvg.setAttribute('width','0');
   connSvg.setAttribute('height','0');
-  connSvg.style.cssText='position:absolute;top:0;left:0;overflow:visible;z-index:5;';
+  connSvg.style.cssText='position:absolute;top:0;left:0;overflow:visible;z-index:50;';
   const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
   const marker=document.createElementNS('http://www.w3.org/2000/svg','marker');
   marker.setAttribute('id','arrowhead');
