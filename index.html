@@ -33,7 +33,6 @@
     .dot.spin { background: none; border: 2px solid currentColor; border-top-color: transparent; animation: spin 0.8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ヘッダー行（ロール名・固定） */
     #header-row {
       position: fixed; top: 50px; left: 0; right: 0; height: 56px;
       background: rgba(240,240,237,0.96); backdrop-filter: blur(6px);
@@ -45,10 +44,8 @@
       display: flex; align-items: center; justify-content: center;
       font-size: 12px; font-weight: 700; color: #3a8880;
       text-align: center; line-height: 1.4; white-space: pre;
-      pointer-events: none;
     }
 
-    /* ボード */
     #board-wrap {
       position: fixed; top: 106px; left: 0; right: 0; bottom: 0;
       overflow: hidden; cursor: grab; user-select: none;
@@ -59,41 +56,40 @@
     #board-wrap.grabbing { cursor: grabbing; }
     #board { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
 
-    /* タスクカード */
+    /* SVGオーバーレイ：board-wrap直下、transformなし */
+    #conn-svg {
+      position: absolute; inset: 0;
+      pointer-events: none;
+      z-index: 60;
+    }
+
     .tcard {
       position: absolute; background: white; z-index: 10;
       border-radius: 8px; border: 2px solid #4a9d96;
       padding: 7px 10px;
       box-shadow: 0 1px 4px rgba(0,0,0,0.07);
-      cursor: pointer; overflow: visible;
+      cursor: pointer; overflow: hidden;
       transition: box-shadow 0.15s;
     }
     .tcard:hover { box-shadow: 0 4px 14px rgba(74,157,150,0.25); z-index: 20 !important; }
-    .tcard.selected { border-color: #2d7a73; box-shadow: 0 0 0 3px rgba(74,157,150,0.3); z-index: 20 !important; }
     .tcard .ct { font-size: 11px; font-weight: 600; color: #1a3a38; line-height: 1.4; }
     .tcard .cp { font-size: 9px; color: #999; margin-top: 3px; line-height: 1.4; }
 
-    /* コネクタハンドル（ボード直下に配置） */
+    /* ハンドル：board直下に配置、counter-scaleで常に固定視覚サイズ */
     .conn-handle {
       position: absolute; width: 14px; height: 14px;
       background: #4a9d96; border: 2px solid white;
-      border-radius: 50%; cursor: crosshair;
-      z-index: 100; transition: transform 0.1s;
+      border-radius: 50%; cursor: crosshair; z-index: 100;
     }
-    .conn-handle:hover { transform: scale(1.35); }
+    .conn-handle:hover { background: #2d7a73; }
 
-    /* セクション区切り */
     .sec-divider {
-      position: absolute; display: flex; align-items: center; gap: 8px;
+      position: absolute; display: flex; align-items: center;
       font-size: 10px; font-weight: 700; color: #aaa;
       pointer-events: none; white-space: nowrap;
     }
-    .sec-line {
-      position: absolute; background: #d8d8d4;
-      pointer-events: none;
-    }
+    .sec-line { position: absolute; background: #d8d8d4; pointer-events: none; }
 
-    /* 詳細パネル */
     #detail {
       position: fixed; right: 16px; top: 122px; width: 260px;
       background: white; border-radius: 12px;
@@ -109,7 +105,6 @@
     .d-val { font-size: 0.85rem; color: #333; }
     .d-note { font-size: 0.82rem; color: #666; line-height: 1.6; }
 
-    /* オーバーレイ */
     #overlay {
       position: fixed; inset: 50px 0 0 0;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -121,7 +116,7 @@
     .err-box strong { display: block; margin-bottom: 8px; font-size: 1rem; }
     .err-box code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 0.82rem; word-break: break-all; }
   </style>
-<!-- deploy:1775183901 --></head>
+<!-- deploy:1775185174 --></head>
 <body>
 
 <div id="toolbar">
@@ -135,7 +130,17 @@
 </div>
 
 <div id="header-row"></div>
-<div id="board-wrap"><div id="board"></div></div>
+<div id="board-wrap">
+  <div id="board"></div>
+  <!-- SVGはboardの外：transformに影響されない -->
+  <svg id="conn-svg">
+    <defs>
+      <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#4a9d96"/>
+      </marker>
+    </defs>
+  </svg>
+</div>
 
 <div id="overlay">
   <div class="spinner"></div>
@@ -157,7 +162,6 @@ const CACHE_KEY = 'taskmap_v3';
 const TTL_MS    = 30 * 60 * 1000;
 
 const COL_W      = 200;
-const COL_GAP    = 0;
 const CARD_W     = COL_W - 8;
 const CARD_H     = 48;
 const ROW_H      = 68;
@@ -183,10 +187,8 @@ async function loadData(force=false){
   if(force) fetching=false;
   if(fetching) return;
   const cache=getCache();
-  if(cache&&!force&&Date.now()-cache.fetchedAt<TTL_MS){
-    DATA=cache.data; setStatus('#6ee7b7','キャッシュ'); boot(); return;
-  }
-  if(cache&&!force){ DATA=cache.data; boot(); setStatus('rgba(255,255,255,0.7)','確認中...',true); }
+  if(cache&&!force&&Date.now()-cache.fetchedAt<TTL_MS){DATA=cache.data;setStatus('#6ee7b7','キャッシュ');boot();return;}
+  if(cache&&!force){DATA=cache.data;boot();setStatus('rgba(255,255,255,0.7)','確認中...',true);}
   fetching=true;
   try{
     const res=await fetch(GAS_URL);
@@ -200,104 +202,138 @@ async function loadData(force=false){
       document.getElementById('overlay').style.display='flex';
       document.getElementById('overlay').innerHTML=`<div class="err-box"><strong>⚠️ データ取得失敗</strong><br><code>${GAS_URL}</code><br><br>${e.message}</div>`;
       setStatus('#fca5a5','読み込み失敗');
-    }else{ setStatus('#fca5a5','オフライン'); }
-  }finally{ fetching=false; }
-}
-
-// ── ヘッダーピルのX位置更新 ──
-function updateHeaders(){
-  document.querySelectorAll('.role-pill').forEach((pill,ri)=>{
-    const colLeft=tx+(PAD_L+ri*COL_W)*sc;
-    pill.style.left=colLeft+'px';
-    pill.style.width=(COL_W*sc)+'px';
-  });
+    }else{setStatus('#fca5a5','オフライン');}
+  }finally{fetching=false;}
 }
 
 // ── ズーム / パン ──
 let sc=1,tx=0,ty=0;
-const wrap=document.getElementById('board-wrap');
-const board=document.getElementById('board');
-function applyT(){board.style.transform=`translate(${tx}px,${ty}px) scale(${sc})`;updateHeaders();updateHandleScales();}
+const wrap  = document.getElementById('board-wrap');
+const board = document.getElementById('board');
+const connSvg = document.getElementById('conn-svg');
+
+function updateHeaders(){
+  document.querySelectorAll('.role-pill').forEach((pill,ri)=>{
+    pill.style.left=(tx+(PAD_L+ri*COL_W)*sc)+'px';
+    pill.style.width=(COL_W*sc)+'px';
+  });
+}
 function updateHandleScales(){
   const inv=sc>0?1/sc:1;
-  activeHandles.forEach(h=>{h.style.transform=`scale(${inv})`;h.style.transformOrigin='center center';});
+  document.querySelectorAll('.conn-handle').forEach(h=>{
+    h.style.transform=`scale(${inv})`;
+    h.style.transformOrigin='center center';
+  });
+}
+function applyT(){
+  board.style.transform=`translate(${tx}px,${ty}px) scale(${sc})`;
+  updateHeaders();
+  updateHandleScales();
+  redrawConnections();
 }
 function zoom(f,cx,cy){const ns=clamp(sc*f,0.03,8);tx=cx-(cx-tx)*ns/sc;ty=cy-(cy-ty)*ns/sc;sc=ns;applyT();}
 function doZoomBtn(f){const r=wrap.getBoundingClientRect();zoom(f,r.width/2,r.height/2);}
 wrap.addEventListener('wheel',e=>{e.preventDefault();const r=wrap.getBoundingClientRect();zoom(e.deltaY<0?1.06:1/1.06,e.clientX-r.left,e.clientY-r.top);},{passive:false});
 
+// board座標 → screen座標（wrap基準）
+function b2s(bx,by){return [tx+bx*sc, ty+by*sc];}
+
 // ── カード位置保存 ──
 let saveTotal=0,saveDone=0;
 function updateSaveStatus(){
-  if(saveTotal===0) return;
-  if(saveDone<saveTotal) setStatus('#f59e0b',`保存中... ${saveDone}/${saveTotal}`,true);
-  else{ setStatus('#6ee7b7',`保存完了 ${saveTotal}件 ✓`); setTimeout(()=>{saveTotal=0;saveDone=0;setStatus('#6ee7b7','保存済み');},2000); }
+  if(saveTotal===0)return;
+  if(saveDone<saveTotal)setStatus('#f59e0b',`保存中... ${saveDone}/${saveTotal}`,true);
+  else{setStatus('#6ee7b7',`保存完了 ${saveTotal}件 ✓`);setTimeout(()=>{saveTotal=0;saveDone=0;setStatus('#6ee7b7','保存済み');},2000);}
 }
 async function saveCardPos(key,left,top){
-  saveTotal++; updateSaveStatus();
-  try{ await fetch(`${GAS_URL}?action=save&key=${encodeURIComponent(key)}&left=${left}&top=${top}`); }
-  catch(e){ console.warn('save failed',e); setStatus('#fca5a5','保存失敗'); }
-  finally{ saveDone++; updateSaveStatus(); }
+  saveTotal++;updateSaveStatus();
+  try{await fetch(`${GAS_URL}?action=save&key=${encodeURIComponent(key)}&left=${left}&top=${top}`);}
+  catch(e){console.warn('save failed',e);setStatus('#fca5a5','保存失敗');}
+  finally{saveDone++;updateSaveStatus();}
 }
 function cardKey(sec,title){return `${sec}__${title}`;}
 
 // ── コネクタ ──
 let connections=[];
-let cardEls={};
+let cardEls={};       // key → DOM element
+let activeHandles=[]; // current handle divs
 let hoverKey=null;
-let connDrag=null;        // {fromKey, fromDir, x1, y1}
-let connSvg=null, previewPath=null;
-let activeHandles=[];     // handle divs currently in board
+let connDrag=null;    // {fromKey, fromDir}
 
+// board座標でのハンドル位置を返す
 function getHandlePos(key,dir){
   const el=cardEls[key];
   if(!el) return null;
-  const l=parseFloat(el.style.left);
-  const t=parseFloat(el.style.top);
-  const w=CARD_W, h=el.offsetHeight;
+  const l=parseFloat(el.style.left), t=parseFloat(el.style.top);
+  const w=CARD_W, h=el.offsetHeight||CARD_H;
   switch(dir){
-    case 'top':    return {x:l+w/2, y:t};
-    case 'right':  return {x:l+w,   y:t+h/2};
-    case 'bottom': return {x:l+w/2, y:t+h};
-    case 'left':   return {x:l,     y:t+h/2};
+    case 'top':    return {x:l+w/2,   y:t};
+    case 'right':  return {x:l+w,     y:t+h/2};
+    case 'bottom': return {x:l+w/2,   y:t+h};
+    case 'left':   return {x:l,       y:t+h/2};
   }
+  return null;
 }
 
-function nearestDir(key,px,py){
+// screen座標でのハンドル位置を返す
+function getHandlePosScreen(key,dir){
+  const p=getHandlePos(key,dir);
+  if(!p) return null;
+  return b2s(p.x,p.y);
+}
+
+// 最寄り辺を返す（board座標）
+function nearestDir(key,bx,by){
   const el=cardEls[key];
   if(!el) return 'left';
-  const l=parseFloat(el.style.left);
-  const t=parseFloat(el.style.top);
-  const w=CARD_W, h=el.offsetHeight;
-  const nx=(px-(l+w/2))/(w/2), ny=(py-(t+h/2))/(h/2);
+  const l=parseFloat(el.style.left), t=parseFloat(el.style.top);
+  const w=CARD_W, h=el.offsetHeight||CARD_H;
+  const nx=(bx-(l+w/2))/(w/2), ny=(by-(t+h/2))/(h/2);
   if(Math.abs(nx)>Math.abs(ny)) return nx>0?'right':'left';
   return ny>0?'bottom':'top';
 }
 
+// screen座標でのベジェパス文字列
 function connPathD(x1,y1,dir1,x2,y2,dir2){
   const dist=Math.hypot(x2-x1,y2-y1);
-  const tension=Math.max(50,dist*0.4);
+  const tension=Math.max(60,dist*0.4);
   const off={top:[0,-1],right:[1,0],bottom:[0,1],left:[-1,0]};
   const [dx1,dy1]=off[dir1]||[1,0];
   const [dx2,dy2]=off[dir2]||[-1,0];
   return `M${x1},${y1} C${x1+dx1*tension},${y1+dy1*tension} ${x2+dx2*tension},${y2+dy2*tension} ${x2},${y2}`;
 }
 
+// ── SVG描画（screen座標） ──
+let previewLine=null; // SVG path for preview
+
+function initPreviewLine(){
+  if(previewLine) previewLine.remove();
+  previewLine=document.createElementNS('http://www.w3.org/2000/svg','path');
+  previewLine.setAttribute('fill','none');
+  previewLine.setAttribute('stroke','#4a9d96');
+  previewLine.setAttribute('stroke-width','2');
+  previewLine.setAttribute('stroke-dasharray','8,5');
+  previewLine.setAttribute('marker-end','url(#arrowhead)');
+  previewLine.style.display='none';
+  connSvg.appendChild(previewLine);
+}
+
 function redrawConnections(){
-  if(!connSvg) return;
-  document.querySelectorAll('.conn-path').forEach(el=>el.remove());
+  // remove old conn-paths
+  connSvg.querySelectorAll('.conn-path').forEach(p=>p.remove());
   connections.forEach((conn,i)=>{
-    const p1=getHandlePos(conn.from,conn.fromDir);
-    const p2=getHandlePos(conn.to,conn.toDir);
-    if(!p1||!p2) return;
+    const sp1=getHandlePosScreen(conn.from,conn.fromDir);
+    const sp2=getHandlePosScreen(conn.to,conn.toDir);
+    if(!sp1||!sp2) return;
     const path=document.createElementNS('http://www.w3.org/2000/svg','path');
-    path.setAttribute('d',connPathD(p1.x,p1.y,conn.fromDir,p2.x,p2.y,conn.toDir));
     path.setAttribute('class','conn-path');
     path.setAttribute('fill','none');
     path.setAttribute('stroke','#4a9d96');
     path.setAttribute('stroke-width','2');
     path.setAttribute('marker-end','url(#arrowhead)');
-    path.style.pointerEvents='stroke';
+    path.setAttribute('d',connPathD(sp1[0],sp1[1],conn.fromDir,sp2[0],sp2[1],conn.toDir));
+    // 右クリック削除（pointer-eventsをautoにして応答させる）
+    path.style.pointerEvents='auto';
     path.style.cursor='pointer';
     path.dataset.idx=i;
     path.addEventListener('contextmenu',e=>{
@@ -307,7 +343,9 @@ function redrawConnections(){
       redrawConnections();
       saveConns();
     });
-    connSvg.insertBefore(path,previewPath);
+    // previewLineの前に挿入
+    if(previewLine&&connSvg.contains(previewLine)) connSvg.insertBefore(path,previewLine);
+    else connSvg.appendChild(path);
   });
 }
 
@@ -323,6 +361,7 @@ async function saveConns(){
   }
 }
 
+// ── ハンドル（board直下、hover表示） ──
 function clearHandles(){
   activeHandles.forEach(h=>h.remove());
   activeHandles=[];
@@ -333,9 +372,9 @@ function showHandles(key){
   const el=cardEls[key];
   if(!el) return;
   hoverKey=key;
-  const l=parseFloat(el.style.left);
-  const t=parseFloat(el.style.top);
+  const l=parseFloat(el.style.left), t=parseFloat(el.style.top);
   const w=CARD_W, h=el.offsetHeight||CARD_H;
+  // ハンドルの中心をカード辺の中点に合わせる（7 = 14px/2）
   const pts={top:[l+w/2-7,t-7],right:[l+w-7,t+h/2-7],bottom:[l+w/2-7,t+h-7],left:[l-7,t+h/2-7]};
   Object.entries(pts).forEach(([dir,[hx,hy]])=>{
     const handle=document.createElement('div');
@@ -344,8 +383,9 @@ function showHandles(key){
     handle.style.top=hy+'px';
     handle.addEventListener('mousedown',ev=>{
       ev.stopPropagation();
-      const pos=getHandlePos(key,dir);
-      if(pos) connDrag={fromKey:key,fromDir:dir,x1:pos.x,y1:pos.y};
+      ev.preventDefault();
+      connDrag={fromKey:key,fromDir:dir};
+      wrap.style.cursor='crosshair';
     });
     handle.addEventListener('mouseleave',ev=>onLeave(ev.relatedTarget));
     board.appendChild(handle);
@@ -366,20 +406,6 @@ function onLeave(rt){
   }
 }
 
-function updateHandles(key){
-  if(!key||activeHandles.length!==4) return;
-  const el=cardEls[key];
-  if(!el) return;
-  const l=parseFloat(el.style.left);
-  const t=parseFloat(el.style.top);
-  const w=CARD_W, h=el.offsetHeight||CARD_H;
-  const pts=[[l+w/2-7,t-7],[l+w-7,t+h/2-7],[l+w/2-7,t+h-7],[l-7,t+h/2-7]];
-  activeHandles.forEach((handle,i)=>{
-    handle.style.left=pts[i][0]+'px';
-    handle.style.top=pts[i][1]+'px';
-  });
-}
-
 // ── パン・カードドラッグ ──
 let drag=false,mx0,my0,tx0,ty0,cardDrag=null;
 wrap.addEventListener('mousedown',e=>{
@@ -390,7 +416,7 @@ wrap.addEventListener('mousedown',e=>{
 window.addEventListener('mousemove',e=>{
   if(drag){tx=tx0+(e.clientX-mx0);ty=ty0+(e.clientY-my0);applyT();}
   if(cardDrag){
-    const dx=(e.clientX-cardDrag.sx)/sc,dy=(e.clientY-cardDrag.sy)/sc;
+    const dx=(e.clientX-cardDrag.sx)/sc, dy=(e.clientY-cardDrag.sy)/sc;
     if(Math.abs(dx)>3||Math.abs(dy)>3) cardDrag.moved=true;
     if(cardDrag.moved){
       cardDrag.el.style.left=(cardDrag.ox+dx)+'px';
@@ -398,43 +424,45 @@ window.addEventListener('mousemove',e=>{
       cardDrag.el.style.zIndex=1000;
       cardDrag.el.style.boxShadow='0 8px 24px rgba(74,157,150,0.3)';
       redrawConnections();
-      updateHandles(hoverKey);
+      // ドラッグ中のハンドル位置更新
+      if(hoverKey===cardDrag.key) showHandles(hoverKey);
     }
   }
-  if(connDrag&&previewPath){
+  if(connDrag&&previewLine){
+    // マウスのscreen座標（wrap基準）
     const r=wrap.getBoundingClientRect();
-    const bx=(e.clientX-r.left-tx)/sc;
-    const by=(e.clientY-r.top-ty)/sc;
-    previewPath.setAttribute('d',connPathD(connDrag.x1,connDrag.y1,connDrag.fromDir,bx,by,'left'));
-    previewPath.style.display='';
+    const mx=e.clientX-r.left, my=e.clientY-r.top;
+    const sp=getHandlePosScreen(connDrag.fromKey,connDrag.fromDir);
+    if(sp){
+      previewLine.setAttribute('d',connPathD(sp[0],sp[1],connDrag.fromDir,mx,my,'left'));
+      previewLine.style.display='';
+    }
   }
 });
 
 window.addEventListener('mouseup',e=>{
-  drag=false; wrap.classList.remove('grabbing');
+  drag=false; wrap.classList.remove('grabbing'); wrap.style.cursor='';
   if(cardDrag){
     if(cardDrag.moved){
-      const left=parseFloat(cardDrag.el.style.left),top=parseFloat(cardDrag.el.style.top);
-      cardDrag.el.style.boxShadow='';
-      cardDrag.el.style.zIndex='';
+      const left=parseFloat(cardDrag.el.style.left), top=parseFloat(cardDrag.el.style.top);
+      cardDrag.el.style.boxShadow=''; cardDrag.el.style.zIndex='';
       saveCardPos(cardDrag.key,left,top);
       if(DATA.positions) DATA.positions[cardDrag.key]={left,top};
       putCache({data:DATA,fetchedAt:Date.now()});
       redrawConnections();
-      updateHandles(hoverKey);
     }else{
       showDetail(cardDrag.task,cardDrag.sectionTitle);
     }
     cardDrag=null;
   }
   if(connDrag){
-    if(previewPath) previewPath.style.display='none';
+    if(previewLine) previewLine.style.display='none';
+    // ドロップ先カードを判定
     const target=e.target.closest('.tcard');
     if(target&&target.dataset.key&&target.dataset.key!==connDrag.fromKey){
       const toKey=target.dataset.key;
       const r=wrap.getBoundingClientRect();
-      const bx=(e.clientX-r.left-tx)/sc;
-      const by=(e.clientY-r.top-ty)/sc;
+      const bx=(e.clientX-r.left-tx)/sc, by=(e.clientY-r.top-ty)/sc;
       const toDir=nearestDir(toKey,bx,by);
       connections.push({from:connDrag.fromKey,fromDir:connDrag.fromDir,to:toKey,toDir});
       if(DATA){DATA.connections=connections;putCache({data:DATA,fetchedAt:Date.now()});}
@@ -452,7 +480,7 @@ wrap.addEventListener('touchstart',e=>{e.preventDefault();for(const t of e.chang
 wrap.addEventListener('touchmove',e=>{e.preventDefault();for(const t of e.changedTouches)tpts[t.identifier]=[t.clientX,t.clientY];const ids=Object.keys(tpts);if(ids.length===1&&ppan){const[cx,cy]=tpts[ids[0]];tx=ppan.tx0+cx-ppan.cx;ty=ppan.ty0+cy-ppan.cy;applyT();}else if(ids.length>=2&&pinch0){const[a,b]=ids.slice(0,2).map(id=>tpts[id]);const d=Math.hypot(b[0]-a[0],b[1]-a[1]);const ns=clamp(pinch0.sc0*d/pinch0.d,0.03,8);tx=pinch0.mx-(pinch0.mx-pinch0.tx0)*ns/pinch0.sc0;ty=pinch0.my-(pinch0.my-pinch0.ty0)*ns/pinch0.sc0;sc=ns;applyT();}},{passive:false});
 wrap.addEventListener('touchend',e=>{for(const t of e.changedTouches)delete tpts[t.identifier];pinch0=null;const ids=Object.keys(tpts);if(ids.length===1)ppan={cx:tpts[ids[0]][0],cy:tpts[ids[0]][1],tx0:tx,ty0:ty};},{passive:false});
 
-// ── 詳細パネル（ダブルクリック） ──
+// ── 詳細パネル ──
 function showDetail(task,sectionTitle){
   document.getElementById('d-title').textContent=task.title;
   document.getElementById('d-section').textContent=sectionTitle;
@@ -467,7 +495,7 @@ function closeDetail(){document.getElementById('detail').style.display='none';}
 // ── ボード構築 ──
 function fitView(){
   if(!DATA||!DATA.roles) return;
-  const vw=wrap.clientWidth,vh=wrap.clientHeight;
+  const vw=wrap.clientWidth, vh=wrap.clientHeight;
   const bw=PAD_L+DATA.roles.length*COL_W+PAD_R;
   let bh=PAD_T;
   (DATA.sections||[]).forEach(s=>{bh+=SEC_HDR_H+SEC_HDR_MB+s.tasks.length*ROW_H;});
@@ -491,10 +519,11 @@ function boot(){
   hoverKey=null;
   connDrag=null;
   clearHandles();
+  initPreviewLine();
 
   const totalColW=roles.length*COL_W;
 
-  // ヘッダーピル生成
+  // ヘッダーピル
   const headerRow=document.getElementById('header-row');
   headerRow.innerHTML='';
   roles.forEach(role=>{
@@ -504,45 +533,13 @@ function boot(){
     headerRow.appendChild(pill);
   });
 
-  // ボード
   board.innerHTML='';
 
-  // 総高さ計算
   let totalH=PAD_T;
   DATA.sections.forEach(s=>{totalH+=SEC_HDR_H+SEC_HDR_MB+s.tasks.length*ROW_H;});
   totalH+=PAD_B;
 
-  // SVGレイヤー（コネクタ用）
-  connSvg=document.createElementNS('http://www.w3.org/2000/svg','svg');
-  connSvg.setAttribute('width','0');
-  connSvg.setAttribute('height','0');
-  connSvg.style.cssText='position:absolute;top:0;left:0;overflow:visible;z-index:50;';
-  const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
-  const marker=document.createElementNS('http://www.w3.org/2000/svg','marker');
-  marker.setAttribute('id','arrowhead');
-  marker.setAttribute('markerWidth','8');
-  marker.setAttribute('markerHeight','6');
-  marker.setAttribute('refX','7');
-  marker.setAttribute('refY','3');
-  marker.setAttribute('orient','auto');
-  const arrowPoly=document.createElementNS('http://www.w3.org/2000/svg','polygon');
-  arrowPoly.setAttribute('points','0 0, 8 3, 0 6');
-  arrowPoly.setAttribute('fill','#4a9d96');
-  marker.appendChild(arrowPoly);
-  defs.appendChild(marker);
-  connSvg.appendChild(defs);
-  previewPath=document.createElementNS('http://www.w3.org/2000/svg','path');
-  previewPath.setAttribute('fill','none');
-  previewPath.setAttribute('stroke','#4a9d96');
-  previewPath.setAttribute('stroke-width','2');
-  previewPath.setAttribute('stroke-dasharray','6,4');
-  previewPath.setAttribute('marker-end','url(#arrowhead)');
-  previewPath.style.display='none';
-  previewPath.style.pointerEvents='none';
-  connSvg.appendChild(previewPath);
-  board.appendChild(connSvg);
-
-  // 縦線（スイムレーン区切り）
+  // 縦線
   for(let ri=1;ri<roles.length;ri++){
     const x=PAD_L+ri*COL_W;
     const vline=document.createElement('div');
@@ -551,7 +548,6 @@ function boot(){
   }
 
   let curY=PAD_T;
-
   DATA.sections.forEach(sec=>{
     const line=document.createElement('div');
     line.className='sec-line';
@@ -568,15 +564,17 @@ function boot(){
     sec.tasks.forEach(task=>{
       const ri=task.primary.length>0?roles.indexOf(task.primary[0]):-1;
       const colX=PAD_L+(ri>=0?ri*COL_W:roles.length*COL_W);
-      const defaultX=colX+(COL_W-CARD_W)/2;
-      const defaultY=curY+(ROW_H-CARD_H)/2;
       const key=cardKey(sec.title,task.title);
       const saved=positions[key];
+      const defaultX=colX+(COL_W-CARD_W)/2;
+      const defaultY=curY+(ROW_H-CARD_H)/2;
 
       const el=document.createElement('div');
       el.className='tcard';
       el.dataset.key=key;
-      el.style.cssText=`left:${saved?saved.left:defaultX}px;top:${saved?saved.top:defaultY}px;width:${CARD_W}px;`;
+      el.style.left=(saved?saved.left:defaultX)+'px';
+      el.style.top=(saved?saved.top:defaultY)+'px';
+      el.style.width=CARD_W+'px';
       const sup=task.support.length?`<div class="cp">○ ${task.support.join(' ')}</div>`:'';
       el.innerHTML=`<div class="ct">${task.title}</div>${sup}`;
 
@@ -586,11 +584,9 @@ function boot(){
         e.stopPropagation();
         cardDrag={el,task,sectionTitle:sec.title,key,sx:e.clientX,sy:e.clientY,ox:parseFloat(el.style.left),oy:parseFloat(el.style.top),moved:false};
       });
-      el.addEventListener('dblclick',e=>{
-        e.stopPropagation();
-        showDetail(task,sec.title);
+      el.addEventListener('click',e=>{
+        if(!cardDrag||!cardDrag.moved) showDetail(task,sec.title);
       });
-      el.addEventListener('touchend',e=>{e.stopPropagation();e.preventDefault();showDetail(task,sec.title);},{passive:false});
 
       board.appendChild(el);
       cardEls[key]=el;
