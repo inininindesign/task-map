@@ -118,7 +118,7 @@
     .err-box strong { display: block; margin-bottom: 8px; font-size: 1rem; }
     .err-box code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 0.82rem; word-break: break-all; }
   </style>
-<!-- deploy:1775191069 --></head>
+<!-- deploy:1775192228 --></head>
 <body>
 
 <div id="toolbar">
@@ -139,6 +139,9 @@
     <defs>
       <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
         <polygon points="0 0, 8 3, 0 6" fill="#4a9d96"/>
+      </marker>
+      <marker id="arrowhead-sel" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#e05555"/>
       </marker>
     </defs>
   </svg>
@@ -257,10 +260,12 @@ function cardKey(sec,title){return `${sec}__${title}`;}
 
 // ── コネクタ ──
 let connections=[];
-let cardEls={};       // key → DOM element
-let activeHandles=[]; // current handle divs
+let cardEls={};
+let activeHandles=[];
 let hoverKey=null;
-let connDrag=null;    // {fromKey, fromDir}
+let connDrag=null;        // 新規接続ドラッグ {fromKey, fromDir}
+let selectedConnIdx=null; // 選択中の接続インデックス
+let connEndDrag=null;     // 端点付け替えドラッグ {connIdx, end:'from'|'to'}
 
 // board座標でのハンドル位置を返す
 function getHandlePos(key,dir){
@@ -321,34 +326,75 @@ function initPreviewLine(){
 }
 
 function redrawConnections(){
-  // remove old conn-paths
-  connSvg.querySelectorAll('.conn-path').forEach(p=>p.remove());
+  connSvg.querySelectorAll('.conn-path,.conn-ep').forEach(p=>p.remove());
   connections.forEach((conn,i)=>{
     const sp1=getHandlePosScreen(conn.from,conn.fromDir);
     const sp2=getHandlePosScreen(conn.to,conn.toDir);
     if(!sp1||!sp2) return;
+    const sel=(i===selectedConnIdx);
     const path=document.createElementNS('http://www.w3.org/2000/svg','path');
     path.setAttribute('class','conn-path');
     path.setAttribute('fill','none');
-    path.setAttribute('stroke','#4a9d96');
-    path.setAttribute('stroke-width','2');
-    path.setAttribute('marker-end','url(#arrowhead)');
+    path.setAttribute('stroke',sel?'#e05555':'#4a9d96');
+    path.setAttribute('stroke-width',sel?'3':'2');
+    path.setAttribute('marker-end',sel?'url(#arrowhead-sel)':'url(#arrowhead)');
     path.setAttribute('d',connPathD(sp1[0],sp1[1],conn.fromDir,sp2[0],sp2[1],conn.toDir));
-    // 右クリック削除（pointer-eventsをautoにして応答させる）
+    // クリックで選択、右クリックで削除
     path.style.pointerEvents='auto';
     path.style.cursor='pointer';
     path.dataset.idx=i;
+    path.addEventListener('click',e=>{e.stopPropagation();selectConn(i);});
     path.addEventListener('contextmenu',e=>{
       e.preventDefault();
-      connections.splice(parseInt(e.currentTarget.dataset.idx),1);
-      if(DATA){DATA.connections=connections;putCache({data:DATA,fetchedAt:Date.now()});}
-      redrawConnections();
-      saveConns();
+      deleteConn(parseInt(e.currentTarget.dataset.idx));
     });
-    // previewLineの前に挿入
     if(previewLine&&connSvg.contains(previewLine)) connSvg.insertBefore(path,previewLine);
     else connSvg.appendChild(path);
   });
+  // 選択中の端点ハンドルを描画
+  if(selectedConnIdx!==null) drawEndpointHandles(selectedConnIdx);
+}
+
+function drawEndpointHandles(idx){
+  connSvg.querySelectorAll('.conn-ep').forEach(el=>el.remove());
+  const conn=connections[idx];
+  if(!conn) return;
+  [['from',conn.from,conn.fromDir],['to',conn.to,conn.toDir]].forEach(([end,key,dir])=>{
+    const sp=getHandlePosScreen(key,dir);
+    if(!sp) return;
+    const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('class','conn-ep');
+    c.setAttribute('cx',sp[0]); c.setAttribute('cy',sp[1]); c.setAttribute('r',7);
+    c.setAttribute('fill','white'); c.setAttribute('stroke','#e05555'); c.setAttribute('stroke-width',2);
+    c.style.cursor='crosshair'; c.style.pointerEvents='auto';
+    c.addEventListener('mousedown',ev=>{
+      ev.stopPropagation();
+      connEndDrag={connIdx:idx,end};
+      wrap.style.cursor='crosshair';
+    });
+    connSvg.appendChild(c);
+  });
+}
+
+function selectConn(idx){
+  selectedConnIdx=idx;
+  redrawConnections();
+}
+
+function deselectConn(){
+  if(selectedConnIdx===null) return;
+  selectedConnIdx=null;
+  connSvg.querySelectorAll('.conn-ep').forEach(el=>el.remove());
+  redrawConnections();
+}
+
+function deleteConn(idx){
+  connections.splice(idx,1);
+  if(selectedConnIdx===idx) selectedConnIdx=null;
+  else if(selectedConnIdx>idx) selectedConnIdx--;
+  if(DATA){DATA.connections=connections;putCache({data:DATA,fetchedAt:Date.now()});}
+  redrawConnections();
+  saveConns();
 }
 
 async function saveConns(){
@@ -411,6 +457,8 @@ function onLeave(rt){
 let drag=false,mx0,my0,tx0,ty0,cardDrag=null;
 wrap.addEventListener('mousedown',e=>{
   if(e.target.closest('.tcard')||e.target.classList.contains('conn-handle')) return;
+  if(e.target.classList.contains('conn-path')||e.target.classList.contains('conn-ep')) return;
+  deselectConn();
   drag=true;mx0=e.clientX;my0=e.clientY;tx0=tx;ty0=ty;wrap.classList.add('grabbing');
 });
 
@@ -430,13 +478,30 @@ window.addEventListener('mousemove',e=>{
     }
   }
   if(connDrag&&previewLine){
-    // マウスのscreen座標（wrap基準）
     const r=wrap.getBoundingClientRect();
     const mx=e.clientX-r.left, my=e.clientY-r.top;
     const sp=getHandlePosScreen(connDrag.fromKey,connDrag.fromDir);
     if(sp){
       previewLine.setAttribute('d',connPathD(sp[0],sp[1],connDrag.fromDir,mx,my,'left'));
       previewLine.style.display='';
+    }
+  }
+  if(connEndDrag&&previewLine){
+    const r=wrap.getBoundingClientRect();
+    const mx=e.clientX-r.left, my=e.clientY-r.top;
+    const conn=connections[connEndDrag.connIdx];
+    if(conn){
+      const fixedEnd=connEndDrag.end==='from'?'to':'from';
+      const fixedKey=fixedEnd==='from'?conn.from:conn.to;
+      const fixedDir=fixedEnd==='from'?conn.fromDir:conn.toDir;
+      const sp=getHandlePosScreen(fixedKey,fixedDir);
+      if(sp){
+        const d=connEndDrag.end==='from'
+          ?connPathD(mx,my,'left',sp[0],sp[1],fixedDir)
+          :connPathD(sp[0],sp[1],fixedDir,mx,my,'left');
+        previewLine.setAttribute('d',d);
+        previewLine.style.display='';
+      }
     }
   }
 });
@@ -472,6 +537,34 @@ window.addEventListener('mouseup',e=>{
     }
     connDrag=null;
     clearHandles(); hoverKey=null;
+  }
+  if(connEndDrag){
+    if(previewLine) previewLine.style.display='none';
+    wrap.style.cursor='';
+    const target=e.target.closest('.tcard');
+    if(target&&target.dataset.key){
+      const newKey=target.dataset.key;
+      const r=wrap.getBoundingClientRect();
+      const bx=(e.clientX-r.left-tx)/sc, by=(e.clientY-r.top-ty)/sc;
+      const newDir=nearestDir(newKey,bx,by);
+      const conn=connections[connEndDrag.connIdx];
+      if(conn){
+        if(connEndDrag.end==='from'){conn.from=newKey;conn.fromDir=newDir;}
+        else{conn.to=newKey;conn.toDir=newDir;}
+        if(DATA){DATA.connections=connections;putCache({data:DATA,fetchedAt:Date.now()});}
+        saveConns();
+      }
+    }
+    connEndDrag=null;
+    redrawConnections();
+  }
+});
+
+// Delete / Backspace キーで選択中の接続を削除
+window.addEventListener('keydown',e=>{
+  if((e.key==='Delete'||e.key==='Backspace')&&selectedConnIdx!==null){
+    e.preventDefault();
+    deleteConn(selectedConnIdx);
   }
 });
 
@@ -519,6 +612,8 @@ function boot(){
   cardEls={};
   hoverKey=null;
   connDrag=null;
+  connEndDrag=null;
+  selectedConnIdx=null;
   clearHandles();
   initPreviewLine();
 
